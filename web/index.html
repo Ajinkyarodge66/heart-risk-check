@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Heart Risk Check</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A two-minute heart screening that runs on your phone. No blood test needed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: one narrow column like a clinic leaflet; a step rail on top, one card per step, result as a stacked report. */
+:root {
+  --bg: #eef3f2; --surface: #ffffff; --sunk: #e3ebea; --ink: #0f2328; --muted: #566b70; --line: #cfdcdb;
+  --accent: #c8324b; --accent-soft: #f6dde2; --on-accent: #ffffff;
+  --good: #1d7f57; --good-soft: #d7efe4; --warn: #9a6512; --warn-soft: #f6e8cc; --bad: #c8324b; --bad-soft: #f6dde2;
+  --dot: #c9d6d5;
+  --display: "Bricolage Grotesque", "Noto Sans", system-ui, sans-serif;
+  --body: "Noto Sans", "Noto Sans Devanagari", "Noto Sans Arabic", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1517; --surface: #122023; --sunk: #0e1a1d; --ink: #e4eeef; --muted: #93a9ad; --line: #24393d;
+  --accent: #ff6f83; --accent-soft: #3a1b22; --on-accent: #1a0a0e;
+  --good: #4cc490; --good-soft: #12302a; --warn: #e3ab4f; --warn-soft: #33270f; --bad: #ff6f83; --bad-soft: #3a1b22;
+  --dot: #2b4044; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0b1517; --surface: #122023; --sunk: #0e1a1d; --ink: #e4eeef; --muted: #93a9ad; --line: #24393d;
+  --accent: #ff6f83; --accent-soft: #3a1b22; --on-accent: #1a0a0e;
+  --good: #4cc490; --good-soft: #12302a; --warn: #e3ab4f; --warn-soft: #33270f; --bad: #ff6f83; --bad-soft: #3a1b22;
+  --dot: #2b4044; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.bar-in { max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; min-width: 0; }
+.brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand svg { flex: none; }
+.lang { margin-inline-start: auto; flex: none; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.lang select { background: var(--sunk); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: .9rem; max-width: 9.5rem; }
+
+.wrap { max-width: 600px; margin: 0 auto; padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 16px; }
+.intro h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 6vw, 2.2rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 6px; text-wrap: balance; }
+.intro p { margin: 0; color: var(--muted); }
+.privacy { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-size: .85rem; color: var(--good); background: var(--good-soft); border-radius: 999px; padding: 4px 12px; }
+
+.rail { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; list-style: none; padding: 0; margin: 0; }
+.rail li { font-size: .78rem; color: var(--muted); display: grid; gap: 6px; min-width: 0; }
+.rail li::before { content: ""; height: 5px; border-radius: 3px; background: var(--line); }
+.rail li.done::before, .rail li.on::before { background: var(--accent); }
+.rail li.on { color: var(--ink); font-weight: 600; }
+.rail li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 20px; }
+.q { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.q legend, .q > label.lbl { font-weight: 600; padding: 0; margin-bottom: 10px; }
+.q .hint { color: var(--muted); font-size: .85rem; margin-top: -6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { flex: 1 1 0; min-width: 5.5rem; text-align: center; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--sunk); cursor: pointer; font-weight: 500; transition: background .15s, border-color .15s; }
+.seg input:checked + label { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 700; }
+.seg input:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+select.full { width: 100%; padding: 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--sunk); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row.three { grid-template-columns: 1fr 1fr 1fr; }
+.num { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+.num input { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--sunk); font-size: 1rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bmi { display: flex; justify-content: space-between; align-items: baseline; background: var(--sunk); border-radius: 10px; padding: 10px 14px; }
+.bmi b { font-family: var(--display); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.units { display: flex; gap: 6px; }
+.units .seg label { padding: 6px 10px; min-width: 0; font-size: .85rem; white-space: nowrap; }
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.slider input { width: 100%; accent-color: var(--accent); height: 28px; }
+.slider output { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 4.5rem; text-align: end; }
+
+.nav { display: flex; gap: 10px; }
+.btn { border: 0; border-radius: 12px; padding: 14px 18px; font-weight: 700; cursor: pointer; }
+.btn.primary { flex: 1; background: var(--accent); color: var(--on-accent); }
+.btn.ghost { background: transparent; border: 1.5px solid var(--line); }
+.btn:active { transform: translateY(1px); }
+
+/* result */
+.verdict { display: grid; gap: 14px; }
+.chip { justify-self: start; font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; }
+.chip.low { background: var(--good-soft); color: var(--good); }
+.chip.mod { background: var(--warn-soft); color: var(--warn); }
+.chip.high { background: var(--bad-soft); color: var(--bad); }
+.big { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.big .n { font-family: var(--display); font-weight: 800; font-size: clamp(3.4rem, 16vw, 4.6rem); line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.big .n small { font-size: .32em; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-inline-start: 6px; }
+.waffle { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; width: min(100%, 240px); }
+.waffle i { aspect-ratio: 1; border-radius: 50%; background: var(--dot); max-width: 100%; }
+.waffle i.on { background: var(--accent); }
+.sentence { margin: 0; font-size: 1.02rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.facts span { font-size: .85rem; background: var(--sunk); border-radius: 8px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+.scale { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--good-soft), var(--warn-soft) 55%, var(--bad-soft)); margin-top: 6px; }
+.scale b { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); transform: translateX(-50%); }
+h2 { font-family: var(--display); font-size: 1.15rem; margin: 0; letter-spacing: -0.01em; }
+.drv { display: grid; gap: 8px; }
+.drv .r { display: grid; grid-template-columns: minmax(0, 9.5rem) 1fr; gap: 10px; align-items: center; font-size: .88rem; }
+.drv .lab { overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.drv .tr { position: relative; height: 14px; }
+.drv .tr::before { content: ""; position: absolute; inset-inline-start: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--line); }
+.drv .b { position: absolute; top: 0; height: 14px; border-radius: 4px; }
+.drv .b.up { background: var(--bad); inset-inline-start: 50%; }
+.drv .b.dn { background: var(--good); inset-inline-end: 50%; }
+.legend { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); }
+.wi { width: 100%; border-collapse: collapse; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.wi td { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.wi td + td { text-align: end; white-space: nowrap; padding-inline-start: 10px; }
+.wi tr:last-child td { border-bottom: 0; font-weight: 700; }
+.wi .d { color: var(--good); font-weight: 700; }
+.note { color: var(--muted); font-size: .82rem; margin: 0; }
+.steps { margin: 0; padding-inline-start: 1.2rem; display: grid; gap: 8px; }
+.alarm { background: var(--bad-soft); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 6px; }
+.alarm strong { color: var(--bad); }
+.alarm p { margin: 0; font-size: .92rem; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions .btn { flex: 1 1 10rem; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 18px; }
+details summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--muted); font-size: .9rem; margin: 10px 0 0; }
+.disc { color: var(--muted); font-size: .82rem; text-align: center; margin: 0; }
+@media (max-width: 380px) { .row.three { grid-template-columns: 1fr 1fr; } .drv .r { grid-template-columns: minmax(0, 7rem) 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="bar"><div class="bar-in">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 23s-9-5.6-9-12.2A4.8 4.8 0 0 1 13 8a4.8 4.8 0 0 1 9 2.8C22 17.4 13 23 13 23z" fill="var(--accent)"/><path d="M5 13h4l2-3 2.5 6 2-4H21" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span id="brandName">Heart Risk Check</span>
+  </div>
+  <label class="lang"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    <select id="lang" aria-label="Language"></select></label>
+</div></header>
+
+<main class="wrap" id="app"></main>
+
+<script type="application/json" id="model">{"features":["HighBP","HighChol","CholCheck","BMI","Smoker","Stroke","Diabetes","PhysActivity","HvyAlcoholConsump","MentHlth","PhysHlth","Sex","Age"],"mean1":[0.4296242730098163,0.4263393544019448,0.9633196910484044,28.435586361818014,0.44804135766378433,0.041349970766532296,0.2966889251315506,0.760770224943841,0.057566852324829984,3.1594608733113825,4.22319752592547,0.43923285226328584,8.056812936578762],"scale1":[0.4950224813587794,0.494544345119907,0.18797570025620605,6.999554705507183,0.4972929714831863,0.1990983442526311,0.6976098470291294,0.4266132789573463,0.232922540425441,7.343927839395004,8.689786010798622,0.4962936164771257,3.048130485871466],"powers":[[1,0,0,0,0,0,0,0,0,0,0,0,0],[0,1,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,0,0,0,0,0,0,0,0,0,0],[0,0,0,1,0,0,0,0,0,0,0,0,0],[0,0,0,0,1,0,0,0,0,0,0,0,0],[0,0,0,0,0,1,0,0,0,0,0,0,0],[0,0,0,0,0,0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,1,0,0,0,0,0],[0,0,0,0,0,0,0,0,1,0,0,0,0],[0,0,0,0,0,0,0,0,0,1,0,0,0],[0,0,0,0,0,0,0,0,0,0,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,1,0],[0,0,0,0,0,0,0,0,0,0,0,0,1],[2,0,0,0,0,0,0,0,0,0,0,0,0],[1,1,0,0,0,0,0,0,0,0,0,0,0],[1,0,1,0,0,0,0,0,0,0,0,0,0],[1,0,0,1,0,0,0,0,0,0,0,0,0],[1,0,0,0,1,0,0,0,0,0,0,0,0],[1,0,0,0,0,1,0,0,0,0,0,0,0],[1,0,0,0,0,0,1,0,0,0,0,0,0],[1,0,0,0,0,0,0,1,0,0,0,0,0],[1,0,0,0,0,0,0,0,1,0,0,0,0],[1,0,0,0,0,0,0,0,0,1,0,0,0],[1,0,0,0,0,0,0,0,0,0,1,0,0],[1,0,0,0,0,0,0,0,0,0,0,1,0],[1,0,0,0,0,0,0,0,0,0,0,0,1],[0,2,0,0,0,0,0,0,0,0,0,0,0],[0,1,1,0,0,0,0,0,0,0,0,0,0],[0,1,0,1,0,0,0,0,0,0,0,0,0],[0,1,0,0,1,0,0,0,0,0,0,0,0],[0,1,0,0,0,1,0,0,0,0,0,0,0],[0,1,0,0,0,0,1,0,0,0,0,0,0],[0,1,0,0,0,0,0,1,0,0,0,0,0],[0,1,0,0,0,0,0,0,1,0,0,0,0],[0,1,0,0,0,0,0,0,0,1,0,0,0],[0,1,0,0,0,0,0,0,0,0,1,0,0],[0,1,0,0,0,0,0,0,0,0,0,1,0],[0,1,0,0,0,0,0,0,0,0,0,0,1],[0,0,2,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,0,0,0,0,0,0,0,0,0],[0,0,1,0,1,0,0,0,0,0,0,0,0],[0,0,1,0,0,1,0,0,0,0,0,0,0],[0,0,1,0,0,0,1,0,0,0,0,0,0],[0,0,1,0,0,0,0,1,0,0,0,0,0],[0,0,1,0,0,0,0,0,1,0,0,0,0],[0,0,1,0,0,0,0,0,0,1,0,0,0],[0,0,1,0,0,0,0,0,0,0,1,0,0],[0,0,1,0,0,0,0,0,0,0,0,1,0],[0,0,1,0,0,0,0,0,0,0,0,0,1],[0,0,0,2,0,0,0,0,0,0,0,0,0],[0,0,0,1,1,0,0,0,0,0,0,0,0],[0,0,0,1,0,1,0,0,0,0,0,0,0],[0,0,0,1,0,0,1,0,0,0,0,0,0],[0,0,0,1,0,0,0,1,0,0,0,0,0],[0,0,0,1,0,0,0,0,1,0,0,0,0],[0,0,0,1,0,0,0,0,0,1,0,0,0],[0,0,0,1,0,0,0,0,0,0,1,0,0],[0,0,0,1,0,0,0,0,0,0,0,1,0],[0,0,0,1,0,0,0,0,0,0,0,0,1],[0,0,0,0,2,0,0,0,0,0,0,0,0],[0,0,0,0,1,1,0,0,0,0,0,0,0],[0,0,0,0,1,0,1,0,0,0,0,0,0],[0,0,0,0,1,0,0,1,0,0,0,0,0],[0,0,0,0,1,0,0,0,1,0,0,0,0],[0,0,0,0,1,0,0,0,0,1,0,0,0],[0,0,0,0,1,0,0,0,0,0,1,0,0],[0,0,0,0,1,0,0,0,0,0,0,1,0],[0,0,0,0,1,0,0,0,0,0,0,0,1],[0,0,0,0,0,2,0,0,0,0,0,0,0],[0,0,0,0,0,1,1,0,0,0,0,0,0],[0,0,0,0,0,1,0,1,0,0,0,0,0],[0,0,0,0,0,1,0,0,1,0,0,0,0],[0,0,0,0,0,1,0,0,0,1,0,0,0],[0,0,0,0,0,1,0,0,0,0,1,0,0],[0,0,0,0,0,1,0,0,0,0,0,1,0],[0,0,0,0,0,1,0,0,0,0,0,0,1],[0,0,0,0,0,0,2,0,0,0,0,0,0],[0,0,0,0,0,0,1,1,0,0,0,0,0],[0,0,0,0,0,0,1,0,1,0,0,0,0],[0,0,0,0,0,0,1,0,0,1,0,0,0],[0,0,0,0,0,0,1,0,0,0,1,0,0],[0,0,0,0,0,0,1,0,0,0,0,1,0],[0,0,0,0,0,0,1,0,0,0,0,0,1],[0,0,0,0,0,0,0,2,0,0,0,0,0],[0,0,0,0,0,0,0,1,1,0,0,0,0],[0,0,0,0,0,0,0,1,0,1,0,0,0],[0,0,0,0,0,0,0,1,0,0,1,0,0],[0,0,0,0,0,0,0,1,0,0,0,1,0],[0,0,0,0,0,0,0,1,0,0,0,0,1],[0,0,0,0,0,0,0,0,2,0,0,0,0],[0,0,0,0,0,0,0,0,1,1,0,0,0],[0,0,0,0,0,0,0,0,1,0,1,0,0],[0,0,0,0,0,0,0,0,1,0,0,1,0],[0,0,0,0,0,0,0,0,1,0,0,0,1],[0,0,0,0,0,0,0,0,0,2,0,0,0],[0,0,0,0,0,0,0,0,0,1,1,0,0],[0,0,0,0,0,0,0,0,0,1,0,1,0],[0,0,0,0,0,0,0,0,0,1,0,0,1],[0,0,0,0,0,0,0,0,0,0,2,0,0],[0,0,0,0,0,0,0,0,0,0,1,1,0],[0,0,0,0,0,0,0,0,0,0,1,0,1],[0,0,0,0,0,0,0,0,0,0,0,2,0],[0,0,0,0,0,0,0,0,0,0,0,1,1],[0,0,0,0,0,0,0,0,0,0,0,0,2]],"mean2":[4.871987083424813e-15,3.0164093725394396e-15,-5.5936548965139026e-15,4.5555391867252964e-15,-3.94058967005444e-15,-2.213410428912013e-15,-3.9357366934520456e-16,-4.842524168803872e-15,-3.5401960397500453e-16,-8.755363387821989e-15,-1.414554707653156e-17,4.096665565578605e-15,-1.0231068846232205e-15,0.9999999999996082,0.2972636144846897,0.09866742616220957,0.20339298118058283,0.09761720228348052,0.12892989182243142,0.2732982713935574,-0.1276433867830303,-0.008999177444017521,0.05535756412519392,0.15859337580739016,0.047396345565069324,0.3415259933080102,0.9999999999982376,0.0858811026410611,0.09851704249419196,0.08915042692091324,0.09043094565828967,0.21078475743426767,-0.07814562168936896,-0.014512241192776505,0.06051820995291013,0.12094884652090504,0.02934271977493387,0.27294656460818895,0.9999999999996891,0.03362471415752676,-0.01092397291590468,0.024493209776001192,0.06732522389594942,0.005693760307855992,-0.022406089347104436,-0.00910408752992959,0.03047221612235868,-0.02364510389209601,0.08968718610323285,1.0000000000001987,0.008881219524378375,0.018458185658054186,0.21063762976637038,-0.14428308872971501,-0.04807560391784968,0.0839046455488038,0.11475577149479711,0.04043388930652511,-0.04225111078369197,0.9999999999983745,0.06120972848299927,0.06102313575190886,-0.08910473600995726,0.10004289600031689,0.0911913450474458,0.11707479283502517,0.0879660004547545,0.1250279792222327,1.0000000000015243,0.10608466819122925,-0.07093067693327122,-0.01765421045394126,0.07761552226905542,0.15349073141194658,0.00187814562281855,0.12651834768211184,0.9999999999995287,-0.12422851336818252,-0.058050603267071,0.077076236585973,0.17667458357460625,0.02689841434450468,0.18162314351154207,1.000000000002338,0.014489571730689084,-0.12876525193339702,-0.22280712085163684,0.031314268228296645,-0.0935929643317707,1.0000000000012241,0.022449672953706146,-0.027765626730090514,0.0018780720898286722,-0.03391674823038186,0.9999999999995681,0.35798421167632893,-0.08133729567275344,-0.09302162473636384,0.9999999999990178,-0.04220223866517031,0.09971497819648295,1.0000000000023141,-0.031034802002716706,1.0000000000006528],"scale2":[0.999999999999804,0.9999999999991187,0.9999999999998445,1.0000000000000955,0.9999999999991872,1.000000000000762,0.9999999999997643,1.0000000000011688,1.000000000000612,0.9999999999997841,0.9999999999995088,1.0000000000011573,1.0000000000003264,0.28433345813691235,0.9678909297263406,0.9230213216014336,0.9937423414554003,0.9981337114069683,1.0734409224795098,1.0380091313089856,1.0139409222100424,0.995087096061097,1.0217612228346609,1.0311749920627744,1.00052672684478,0.9199143465787716,0.2978929850271627,0.9308648570716265,0.9940538354393501,0.9988001648578103,1.05637888270168,1.0381295466808818,1.0111143313104387,0.9916481618868186,1.0229267893468899,1.0272643831175228,1.0006395616021768,0.9345847763439873,4.929570049919163,0.9498792793483385,1.0055513831167613,0.6656677751339567,0.5926231074162948,1.0169959836729165,1.191261320395195,1.0443884201052946,0.8396574118615829,1.0138957636427255,1.0364051713854745,4.051107699802102,0.997011267034545,1.0401810026806837,1.14429303335303,1.1064773217061463,0.9060010861792254,1.1844550226212056,1.1844391712129965,0.9794651167628069,1.0053325946435887,0.20896592276861942,1.0272214029426054,1.0105128137037889,1.0073844183213239,1.0341233238232705,1.0218649948790748,1.0189609219874924,0.9983803946817631,0.9829463213542207,4.607271154918512,1.4007123000678086,1.1808820354061944,0.8310767248233716,1.4125883187831036,1.5708581782542752,1.0010571829253079,0.9825996129849727,1.9967298475981543,1.132522570051554,0.7460375879482525,1.1934371361488185,1.2932493995756515,1.0062181346870769,0.8851418150696508,1.2225133994004445,0.9656584345358697,1.193995413761782,1.2383242854386978,0.9948088988374697,0.9743905103908749,3.798972369675919,1.0678646937799912,0.8939850880812227,1.000871448526097,0.9904063925516068,2.9293720950221798,1.7371996053858314,0.9779931658685471,0.949846368396381,2.354341654055361,0.9932326218086973,0.9160914889548538,0.24488385793903514,1.0006937614278741,1.1974600455909652],"coef":[0.1990618664645954,0.16063220449771987,0.057430496669770535,0.0665430455802299,0.13109998065406442,0.17580532205077895,0.13414880733938692,-0.04544876078343002,-0.023840985915549374,0.20834734058918383,0.6381573356303469,0.16990880042565307,0.8732011053678321,0.1990618664635122,0.05431217531162019,-0.04345086864461242,-0.010713224494391608,-0.01484894655736466,-0.029245310315380114,-0.03719157978990777,0.027295084246916436,-0.01931818078514726,-0.002640393782532802,-0.00427485365294821,-0.03922719024264151,-0.07606897400711056,0.16063220449222512,0.013127518404910592,-0.01156163649145736,0.00810347992663777,-0.03996065304350417,-0.05380941846565507,0.010147475362725745,-0.0002515435399370616,-0.030642155764013638,-0.012240812515913184,0.02548732741543778,-0.027734704451535853,-0.05743049666988347,0.07497050863941378,-0.013458919270643886,-0.01809140909566013,-0.03242820394196787,0.02361315577002338,-0.008760810497061953,-0.044185898272074024,0.01937516019754403,0.049337348061519584,0.00499564932755961,-0.020828622834547793,-0.023388372139016927,-0.019331132796927233,-0.01242180720394942,0.018834044391646685,-0.010458318483193998,0.00017527301034779495,0.0017147693544308656,0.01514220175386569,0.02970219503334588,0.13109998064704245,-0.015491894663649216,-0.0018705817385585583,-0.0036127880753491362,-0.03537010829250459,-0.0041608363388079585,-0.008072434722537788,0.0010107989839345606,-0.07683455999554911,0.175805322051095,0.01442776469061947,0.011251154438603549,0.0031732205464241638,-0.0018334264987952091,-0.0043823336198382115,-0.02928163374919711,-0.09957002513188971,0.14843350270688394,0.003922277302584209,0.005787137482666214,-0.003938448083025709,-0.015142707058340373,-0.0219093977555667,-0.04454108123279809,0.04544876078519258,-0.0038833839044459108,0.010007525266560334,0.0021686601580971914,0.039179219826498475,0.000241699761558126,-0.023840985915237502,0.011783520971904314,-0.004567525541835155,0.02575292185484528,-0.006806148203697159,-0.0736629142554682,-0.027246002776635626,-0.005981981307274456,-0.020704045415205347,-0.313893047448467,-0.03529624102229094,-0.06850596432314822,0.1699088004344317,0.10998671286225657,0.05383601609714195],"intercept":-0.9139858983492696,"threshold":0.7046919218319656,"base_rate":0.09350863156599071,"quantiles":[0.0005756815128188592,0.00908307670983914,0.010922858054315147,0.012074167349770095,0.013723842910218926,0.015049379119775688,0.01618661332165008,0.017747599784484848,0.019166122559910563,0.020700306949463274,0.02198931915156247,0.0235006841780998,0.02498982444945447,0.026484038817239357,0.027973569295546633,0.029638757058972266,0.03151352847303333,0.03294148930988608,0.034064191818617195,0.03552840811894035,0.037145303534612435,0.03885694163504432,0.04074845585366748,0.042772924419594543,0.044503588751255,0.0460083468723312,0.04751908436982405,0.04897464590815777,0.05088073115814681,0.05262604013157529,0.05477635269229577,0.057276995554426224,0.059803666346045496,0.061792093921174164,0.06410103933566699,0.06570513065521087,0.0676547060027858,0.06924976684009643,0.07146784210423622,0.07388950118693799,0.07662834771374138,0.07956159541063895,0.0822556553619616,0.08459108406261533,0.08687292679383574,0.0894550775958321,0.09159442117848801,0.0938702593513663,0.09616065019234497,0.09885326107863718,0.10183122045034926,0.10542802021065582,0.10847990082686301,0.11141150684573248,0.11375333270095307,0.11653372466283314,0.12008691971807181,0.12309063980586668,0.12625992742795114,0.12990183946328468,0.13327245687368328,0.13682423393980409,0.13969984574482489,0.14318553125108696,0.1468006875416955,0.14993498694350763,0.15369366452111943,0.15675108476642707,0.16055395611988893,0.16429100898543159,0.16868030308583082,0.17333439625939054,0.17754031981316645,0.1815646106713491,0.1853769784338861,0.18842436822459163,0.19249491537552382,0.19569617928942754,0.19926251412200224,0.20280335563929613,0.20746342628929104,0.21215046693041872,0.21668617475546242,0.2219610122205536,0.2267453623416159,0.2313784504086038,0.23597678281107165,0.24042046266689882,0.2449966772969007,0.2494031134381155,0.2543648983864564,0.2590029955130488,0.2640932231154831,0.269061072946381,0.2746927016447103,0.2796208406861698,0.2852843916133178,0.2900947277380796,0.2947438893866047,0.3004338181999332,0.30550556343593016,0.3112083337847119,0.3163663664669707,0.3213564109194355,0.3272389369213844,0.33303945711086047,0.3384291194688233,0.34366767288120575,0.3486628764502403,0.3544152234246275,0.3603462383282695,0.36569730803288114,0.3710745933155786,0.3769588231753858,0.3826203679935375,0.3888743590054543,0.39479170770198696,0.4006946499420686,0.4068083769909213,0.4120395196492631,0.4172256036155037,0.4226166071756567,0.42934088866949943,0.4355270695449518,0.44143939221708944,0.448309660292555,0.4544361804748545,0.4602940488011903,0.46583103827765915,0.47135521880522563,0.4774130267303003,0.4831330435986415,0.4898974993633375,0.4965340580110991,0.5030677145765721,0.5089055610191114,0.5147570960923644,0.5208746396014828,0.5269620068036578,0.5324797754677902,0.5385967779417896,0.5438640632200074,0.5498833391592192,0.5557037025963195,0.5620668045870403,0.567733099450842,0.5738698321852084,0.5792999075428724,0.5858266703470736,0.5920466955369372,0.5974542294101441,0.6035813426282095,0.6098344605043324,0.6162885708374313,0.6226133567789411,0.6284873816436508,0.6335775715919065,0.6388022373435687,0.6446438731693317,0.6505028329369198,0.6569345039963629,0.66245590519957,0.6678609354443583,0.6732182992486897,0.6787551698478042,0.6843054690539427,0.6903878677794013,0.6969086435678108,0.7035170309488992,0.7092199657780737,0.7152133430977293,0.7209286521198961,0.7265990973012018,0.7322202403805919,0.7382430308248945,0.7439404039924755,0.749611977247739,0.7564121578971876,0.7638662117745032,0.7713901312034211,0.7779129225056239,0.7837470610889922,0.7897279441215238,0.794580785085946,0.8004119188669941,0.8074579029163913,0.815086374293136,0.8223618390113863,0.8292932162095903,0.8349047226542416,0.841073520932868,0.8476778457915026,0.8569050614796963,0.8657215451680876,0.873006145683474,0.8814783917701521,0.8923671822285438,0.9027391387675204,0.9164937973536534,0.9292102667947053,0.9907028348453683],"ex_mean":[0.4296242730098163,0.4263393544019448,0.9633196910484044,28.435586361818014,0.44804135766378433,0.041349970766532296,0.2966889251315506,0.760770224943841,0.057566852324829984,3.1594608733113825,4.22319752592547,0.43923285226328584,8.056812936578762],"ex_scale":[0.4950224813587794,0.494544345119907,0.18797570025620605,6.999554705507183,0.4972929714831863,0.1990983442526311,0.6976098470291294,0.4266132789573463,0.232922540425441,7.343927839395004,8.689786010798622,0.4962936164771257,3.048130485871466],"ex_coef":[0.35928061120630067,0.31558343386098703,0.08665819613272545,0.06249105961479176,0.22783875336163786,0.2685235259304079,0.1957003407074684,-0.06738281337644793,-0.06983867880896333,0.12047531300204736,0.2842241546785396,0.35846589226951026,0.8404160945332834],"metrics":{"acc":0.8486806677436726,"prec":0.31860970311368575,"rec":0.5429864253393665,"f1":0.4015819896562215,"auc":0.8324146145064727,"rec50":0.8025503907856849,"prec50":0.22458846552319559,"cm":[20744,2823,1111,1320]},"n":129988}</script>
+<script>const I18N = {
+en: { _name: "English",
+  appName: "Heart Risk Check", tagline: "A two-minute heart screening. No blood test needed.",
+  privacy: "Runs on your phone. Your answers never leave this device.",
+  steps: ["You", "Health", "Lifestyle", "Result"], next: "Next", back: "Back", see: "See my result",
+  age: "Age", sex: "Sex", female: "Female", male: "Male",
+  body: "Height and weight", height: "Height", weight: "Weight", bmiIs: "Your BMI",
+  yes: "Yes", no: "No", notSure: "Not sure",
+  q_bp: "Has a doctor or health worker ever told you that you have high blood pressure?",
+  q_chol: "Have you ever been told that you have high cholesterol?",
+  q_cc: "Have you had your cholesterol checked in the last 5 years?",
+  q_stroke: "Have you ever had a stroke?", q_diab: "Do you have diabetes?",
+  d0: "No", d1: "Pre-diabetes", d2: "Yes",
+  q_smoke: "Have you smoked at least 100 cigarettes (5 packs) in your whole life?",
+  q_active: "In the last 30 days, did you do any exercise or physical activity apart from your job?",
+  q_alc: "Do you drink alcohol heavily?", h_alc: "Men: more than 14 drinks a week. Women: more than 7.",
+  q_ment: "In the last 30 days, on how many days was your mental health not good?",
+  h_ment: "Stress, low mood or emotional problems.",
+  q_phys: "In the last 30 days, on how many days was your physical health not good?",
+  h_phys: "Illness or injury.", days: "days",
+  of100: "Of 100 people with answers like yours, about {n} have heart disease or have had a heart attack.",
+  avg: "Average for all adults: {a} in 100", times: "{x}× the average", pct: "Higher than {p}% of adults",
+  band_low: "Lower risk", band_mod: "Raised risk", band_high: "High risk",
+  drivers: "What affects your result", raises: "raises", lowers: "lowers",
+  whatif: "What could bring it down", wi_note: "Based on patterns in survey data. These are estimates, not guarantees.",
+  c_active: "Become physically active", c_bmi: "Reach a BMI of 25", c_bp: "Get blood pressure under control",
+  c_chol: "Get cholesterol under control", c_alc: "Stop heavy drinking", c_all: "All of these together",
+  nextT: "What to do next",
+  n_high: "See a doctor or health worker soon and show them this result.",
+  n_mod: "Book a heart health check in the next few months.",
+  n_low: "Keep up healthy habits and check again each year.",
+  n_bp: "Get your blood pressure measured. It is quick, and often free at pharmacies and clinics.",
+  n_chol: "Ask for a cholesterol test at your next check-up.",
+  n_smoke: "Stopping smoking at any age lowers your heart risk.",
+  n_active: "Aim for 150 minutes of brisk walking each week.",
+  emergT: "Get help now if you have these signs",
+  emerg: "Chest pain or pressure, pain spreading to the arm, jaw or back, shortness of breath, cold sweat or sudden faintness. Call your local emergency number straight away.",
+  disclaimer: "This is a screening tool, not a diagnosis. It cannot confirm or rule out heart disease.",
+  copy: "Copy result", copied: "Copied", restart: "Start again",
+  aboutT: "How this works",
+  about: "The model learned from the answers of {n} adults in a large US health survey (BRFSS 2015). Shown one person with heart disease and one without, it picks the right one {auc}% of the time. Used as a screen it finds {rec}% of people who have heart disease. It has not yet been tested in other countries, so treat your result as a guide.",
+  share: "My Heart Risk Check result: about {n} in 100 ({band}).",
+  f: { HighBP: "High blood pressure", HighChol: "High cholesterol", CholCheck: "Cholesterol check", BMI: "Body weight (BMI)", Smoker: "Smoking history", Stroke: "Past stroke", Diabetes: "Diabetes", PhysActivity: "Physical activity", HvyAlcoholConsump: "Heavy drinking", MentHlth: "Poor mental health days", PhysHlth: "Poor physical health days", Sex: "Sex", Age: "Age" } },
+
+es: { _name: "Español",
+  appName: "Chequeo de Riesgo Cardíaco", tagline: "Una evaluación del corazón en dos minutos. Sin análisis de sangre.",
+  privacy: "Funciona en tu teléfono. Tus respuestas nunca salen de este dispositivo.",
+  steps: ["Tú", "Salud", "Estilo de vida", "Resultado"], next: "Siguiente", back: "Atrás", see: "Ver mi resultado",
+  age: "Edad", sex: "Sexo", female: "Mujer", male: "Hombre",
+  body: "Estatura y peso", height: "Estatura", weight: "Peso", bmiIs: "Tu IMC",
+  yes: "Sí", no: "No", notSure: "No sé",
+  q_bp: "¿Algún médico o profesional de salud te ha dicho que tienes la presión arterial alta?",
+  q_chol: "¿Alguna vez te han dicho que tienes el colesterol alto?",
+  q_cc: "¿Te has revisado el colesterol en los últimos 5 años?",
+  q_stroke: "¿Has tenido alguna vez un derrame cerebral (ictus)?", q_diab: "¿Tienes diabetes?",
+  d0: "No", d1: "Prediabetes", d2: "Sí",
+  q_smoke: "¿Has fumado al menos 100 cigarrillos (5 cajetillas) en toda tu vida?",
+  q_active: "En los últimos 30 días, ¿hiciste ejercicio o actividad física aparte de tu trabajo?",
+  q_alc: "¿Bebes alcohol en exceso?", h_alc: "Hombres: más de 14 bebidas por semana. Mujeres: más de 7.",
+  q_ment: "En los últimos 30 días, ¿cuántos días tu salud mental no fue buena?",
+  h_ment: "Estrés, ánimo bajo o problemas emocionales.",
+  q_phys: "En los últimos 30 días, ¿cuántos días tu salud física no fue buena?",
+  h_phys: "Enfermedad o lesión.", days: "días",
+  of100: "De 100 personas con respuestas como las tuyas, unas {n} tienen una enfermedad del corazón o han tenido un infarto.",
+  avg: "Promedio en adultos: {a} de 100", times: "{x}× el promedio", pct: "Más alto que el {p}% de los adultos",
+  band_low: "Riesgo menor", band_mod: "Riesgo elevado", band_high: "Riesgo alto",
+  drivers: "Qué influye en tu resultado", raises: "sube", lowers: "baja",
+  whatif: "Qué podría bajarlo", wi_note: "Basado en patrones de datos de encuestas. Son estimaciones, no garantías.",
+  c_active: "Hacer actividad física", c_bmi: "Llegar a un IMC de 25", c_bp: "Controlar la presión arterial",
+  c_chol: "Controlar el colesterol", c_alc: "Dejar de beber en exceso", c_all: "Todo esto junto",
+  nextT: "Qué hacer ahora",
+  n_high: "Consulta pronto a un médico o profesional de salud y muéstrale este resultado.",
+  n_mod: "Pide una revisión del corazón en los próximos meses.",
+  n_low: "Mantén tus hábitos saludables y repite la prueba cada año.",
+  n_bp: "Mídete la presión arterial. Es rápido y a menudo gratis en farmacias y centros de salud.",
+  n_chol: "Pide un análisis de colesterol en tu próxima revisión.",
+  n_smoke: "Dejar de fumar a cualquier edad reduce el riesgo cardíaco.",
+  n_active: "Intenta caminar a paso rápido 150 minutos por semana.",
+  emergT: "Busca ayuda ya si tienes estas señales",
+  emerg: "Dolor u opresión en el pecho, dolor que se extiende al brazo, la mandíbula o la espalda, falta de aire, sudor frío o desmayo repentino. Llama de inmediato al número de emergencias de tu país.",
+  disclaimer: "Esta es una herramienta de detección, no un diagnóstico. No puede confirmar ni descartar una enfermedad del corazón.",
+  copy: "Copiar resultado", copied: "Copiado", restart: "Empezar de nuevo",
+  aboutT: "Cómo funciona",
+  about: "El modelo aprendió de las respuestas de {n} adultos en una gran encuesta de salud de EE. UU. (BRFSS 2015). Ante una persona con enfermedad cardíaca y otra sin ella, acierta {auc}% de las veces. Como prueba de detección encuentra al {rec}% de las personas con enfermedad cardíaca. Aún no se ha probado en otros países, así que toma tu resultado como una guía.",
+  share: "Mi resultado del Chequeo de Riesgo Cardíaco: unas {n} de 100 ({band}).",
+  f: { HighBP: "Presión arterial alta", HighChol: "Colesterol alto", CholCheck: "Control de colesterol", BMI: "Peso corporal (IMC)", Smoker: "Historial de tabaco", Stroke: "Ictus previo", Diabetes: "Diabetes", PhysActivity: "Actividad física", HvyAlcoholConsump: "Consumo excesivo de alcohol", MentHlth: "Días de mala salud mental", PhysHlth: "Días de mala salud física", Sex: "Sexo", Age: "Edad" } },
+
+fr: { _name: "Français",
+  appName: "Bilan Risque Cardiaque", tagline: "Un dépistage cardiaque en deux minutes. Sans prise de sang.",
+  privacy: "Fonctionne sur votre téléphone. Vos réponses ne quittent jamais cet appareil.",
+  steps: ["Vous", "Santé", "Mode de vie", "Résultat"], next: "Suivant", back: "Retour", see: "Voir mon résultat",
+  age: "Âge", sex: "Sexe", female: "Femme", male: "Homme",
+  body: "Taille et poids", height: "Taille", weight: "Poids", bmiIs: "Votre IMC",
+  yes: "Oui", no: "Non", notSure: "Je ne sais pas",
+  q_bp: "Un médecin ou un soignant vous a-t-il déjà dit que vous avez de l'hypertension ?",
+  q_chol: "Vous a-t-on déjà dit que vous avez trop de cholestérol ?",
+  q_cc: "Avez-vous fait contrôler votre cholestérol au cours des 5 dernières années ?",
+  q_stroke: "Avez-vous déjà eu un AVC ?", q_diab: "Avez-vous du diabète ?",
+  d0: "Non", d1: "Prédiabète", d2: "Oui",
+  q_smoke: "Avez-vous fumé au moins 100 cigarettes (5 paquets) dans votre vie ?",
+  q_active: "Au cours des 30 derniers jours, avez-vous fait du sport ou une activité physique en dehors du travail ?",
+  q_alc: "Buvez-vous beaucoup d'alcool ?", h_alc: "Hommes : plus de 14 verres par semaine. Femmes : plus de 7.",
+  q_ment: "Au cours des 30 derniers jours, combien de jours votre santé mentale n'était-elle pas bonne ?",
+  h_ment: "Stress, moral bas ou difficultés émotionnelles.",
+  q_phys: "Au cours des 30 derniers jours, combien de jours votre santé physique n'était-elle pas bonne ?",
+  h_phys: "Maladie ou blessure.", days: "jours",
+  of100: "Sur 100 personnes ayant répondu comme vous, environ {n} ont une maladie cardiaque ou ont eu une crise cardiaque.",
+  avg: "Moyenne chez les adultes : {a} sur 100", times: "{x}× la moyenne", pct: "Plus élevé que {p} % des adultes",
+  band_low: "Risque plus faible", band_mod: "Risque accru", band_high: "Risque élevé",
+  drivers: "Ce qui influence votre résultat", raises: "augmente", lowers: "diminue",
+  whatif: "Ce qui pourrait le réduire", wi_note: "D'après les tendances des données d'enquête. Ce sont des estimations, pas des garanties.",
+  c_active: "Faire de l'activité physique", c_bmi: "Atteindre un IMC de 25", c_bp: "Contrôler la tension",
+  c_chol: "Contrôler le cholestérol", c_alc: "Arrêter de trop boire", c_all: "Tout cela ensemble",
+  nextT: "Et maintenant",
+  n_high: "Consultez rapidement un médecin ou un soignant et montrez-lui ce résultat.",
+  n_mod: "Prévoyez un bilan cardiaque dans les prochains mois.",
+  n_low: "Gardez vos bonnes habitudes et refaites le test chaque année.",
+  n_bp: "Faites mesurer votre tension. C'est rapide et souvent gratuit en pharmacie ou en centre de santé.",
+  n_chol: "Demandez un dosage du cholestérol lors de votre prochain bilan.",
+  n_smoke: "Arrêter de fumer, à tout âge, réduit le risque cardiaque.",
+  n_active: "Visez 150 minutes de marche rapide par semaine.",
+  emergT: "Demandez de l'aide tout de suite si vous avez ces signes",
+  emerg: "Douleur ou serrement dans la poitrine, douleur qui s'étend au bras, à la mâchoire ou au dos, essoufflement, sueurs froides ou malaise soudain. Appelez immédiatement le numéro d'urgence de votre pays.",
+  disclaimer: "Ceci est un outil de dépistage, pas un diagnostic. Il ne peut ni confirmer ni exclure une maladie cardiaque.",
+  copy: "Copier le résultat", copied: "Copié", restart: "Recommencer",
+  aboutT: "Comment ça marche",
+  about: "Le modèle a appris à partir des réponses de {n} adultes à une grande enquête de santé américaine (BRFSS 2015). Face à une personne malade du cœur et une autre qui ne l'est pas, il choisit la bonne dans {auc} % des cas. Utilisé en dépistage, il repère {rec} % des personnes atteintes. Il n'a pas encore été testé dans d'autres pays : considérez votre résultat comme un repère.",
+  share: "Mon résultat Bilan Risque Cardiaque : environ {n} sur 100 ({band}).",
+  f: { HighBP: "Hypertension", HighChol: "Cholestérol élevé", CholCheck: "Contrôle du cholestérol", BMI: "Poids (IMC)", Smoker: "Tabagisme", Stroke: "AVC passé", Diabetes: "Diabète", PhysActivity: "Activité physique", HvyAlcoholConsump: "Alcool en excès", MentHlth: "Jours de mauvaise santé mentale", PhysHlth: "Jours de mauvaise santé physique", Sex: "Sexe", Age: "Âge" } },
+
+pt: { _name: "Português",
+  appName: "Teste de Risco Cardíaco", tagline: "Uma avaliação do coração em dois minutos. Sem exame de sangue.",
+  privacy: "Funciona no seu celular. Suas respostas nunca saem deste aparelho.",
+  steps: ["Você", "Saúde", "Estilo de vida", "Resultado"], next: "Próximo", back: "Voltar", see: "Ver meu resultado",
+  age: "Idade", sex: "Sexo", female: "Feminino", male: "Masculino",
+  body: "Altura e peso", height: "Altura", weight: "Peso", bmiIs: "Seu IMC",
+  yes: "Sim", no: "Não", notSure: "Não sei",
+  q_bp: "Algum médico ou profissional de saúde já disse que você tem pressão alta?",
+  q_chol: "Alguém já disse que você tem colesterol alto?",
+  q_cc: "Você verificou o colesterol nos últimos 5 anos?",
+  q_stroke: "Você já teve um AVC (derrame)?", q_diab: "Você tem diabetes?",
+  d0: "Não", d1: "Pré-diabetes", d2: "Sim",
+  q_smoke: "Você já fumou pelo menos 100 cigarros (5 maços) na vida?",
+  q_active: "Nos últimos 30 dias, você fez exercício ou atividade física fora do trabalho?",
+  q_alc: "Você bebe álcool em excesso?", h_alc: "Homens: mais de 14 doses por semana. Mulheres: mais de 7.",
+  q_ment: "Nos últimos 30 dias, em quantos dias sua saúde mental não esteve boa?",
+  h_ment: "Estresse, desânimo ou problemas emocionais.",
+  q_phys: "Nos últimos 30 dias, em quantos dias sua saúde física não esteve boa?",
+  h_phys: "Doença ou lesão.", days: "dias",
+  of100: "De 100 pessoas com respostas como as suas, cerca de {n} têm doença cardíaca ou já tiveram um infarto.",
+  avg: "Média entre adultos: {a} em 100", times: "{x}× a média", pct: "Maior que {p}% dos adultos",
+  band_low: "Risco menor", band_mod: "Risco aumentado", band_high: "Risco alto",
+  drivers: "O que influencia seu resultado", raises: "aumenta", lowers: "diminui",
+  whatif: "O que poderia reduzi-lo", wi_note: "Baseado em padrões de dados de pesquisa. São estimativas, não garantias.",
+  c_active: "Fazer atividade física", c_bmi: "Chegar a um IMC de 25", c_bp: "Controlar a pressão",
+  c_chol: "Controlar o colesterol", c_alc: "Parar de beber em excesso", c_all: "Tudo isso junto",
+  nextT: "O que fazer agora",
+  n_high: "Procure logo um médico ou profissional de saúde e mostre este resultado.",
+  n_mod: "Marque uma avaliação do coração nos próximos meses.",
+  n_low: "Mantenha hábitos saudáveis e refaça o teste todo ano.",
+  n_bp: "Meça sua pressão. É rápido e muitas vezes gratuito em farmácias e postos de saúde.",
+  n_chol: "Peça um exame de colesterol na próxima consulta.",
+  n_smoke: "Parar de fumar em qualquer idade reduz o risco cardíaco.",
+  n_active: "Tente caminhar em ritmo acelerado 150 minutos por semana.",
+  emergT: "Peça ajuda agora se tiver estes sinais",
+  emerg: "Dor ou aperto no peito, dor que vai para o braço, a mandíbula ou as costas, falta de ar, suor frio ou desmaio repentino. Ligue imediatamente para o número de emergência do seu país.",
+  disclaimer: "Esta é uma ferramenta de triagem, não um diagnóstico. Ela não confirma nem descarta doença cardíaca.",
+  copy: "Copiar resultado", copied: "Copiado", restart: "Recomeçar",
+  aboutT: "Como funciona",
+  about: "O modelo aprendeu com as respostas de {n} adultos de uma grande pesquisa de saúde dos EUA (BRFSS 2015). Diante de uma pessoa com doença cardíaca e outra sem, ele acerta {auc}% das vezes. Usado como triagem, encontra {rec}% das pessoas com doença cardíaca. Ainda não foi testado em outros países, então use o resultado como um guia.",
+  share: "Meu resultado no Teste de Risco Cardíaco: cerca de {n} em 100 ({band}).",
+  f: { HighBP: "Pressão alta", HighChol: "Colesterol alto", CholCheck: "Exame de colesterol", BMI: "Peso (IMC)", Smoker: "Histórico de fumo", Stroke: "AVC anterior", Diabetes: "Diabetes", PhysActivity: "Atividade física", HvyAlcoholConsump: "Álcool em excesso", MentHlth: "Dias de saúde mental ruim", PhysHlth: "Dias de saúde física ruim", Sex: "Sexo", Age: "Idade" } },
+
+hi: { _name: "हिन्दी",
+  appName: "हृदय जोखिम जाँच", tagline: "दो मिनट में दिल की जाँच। खून की जाँच की ज़रूरत नहीं।",
+  privacy: "यह आपके फ़ोन पर चलता है। आपके जवाब इस डिवाइस से बाहर नहीं जाते।",
+  steps: ["आप", "स्वास्थ्य", "जीवनशैली", "परिणाम"], next: "आगे", back: "पीछे", see: "मेरा परिणाम देखें",
+  age: "उम्र", sex: "लिंग", female: "महिला", male: "पुरुष",
+  body: "लंबाई और वज़न", height: "लंबाई", weight: "वज़न", bmiIs: "आपका BMI",
+  yes: "हाँ", no: "नहीं", notSure: "पता नहीं",
+  q_bp: "क्या किसी डॉक्टर या स्वास्थ्यकर्मी ने कभी बताया है कि आपको हाई ब्लड प्रेशर है?",
+  q_chol: "क्या आपको कभी बताया गया है कि आपका कोलेस्ट्रॉल ज़्यादा है?",
+  q_cc: "क्या पिछले 5 साल में आपने कोलेस्ट्रॉल की जाँच करवाई है?",
+  q_stroke: "क्या आपको कभी स्ट्रोक (लकवा) हुआ है?", q_diab: "क्या आपको डायबिटीज़ (शुगर) है?",
+  d0: "नहीं", d1: "प्री-डायबिटीज़", d2: "हाँ",
+  q_smoke: "क्या आपने पूरे जीवन में कम से कम 100 सिगरेट (5 पैकेट) पी हैं?",
+  q_active: "पिछले 30 दिनों में, क्या आपने काम के अलावा कोई व्यायाम या शारीरिक गतिविधि की?",
+  q_alc: "क्या आप बहुत ज़्यादा शराब पीते हैं?", h_alc: "पुरुष: हफ़्ते में 14 से ज़्यादा ड्रिंक। महिलाएँ: 7 से ज़्यादा।",
+  q_ment: "पिछले 30 दिनों में, कितने दिन आपका मानसिक स्वास्थ्य ठीक नहीं था?",
+  h_ment: "तनाव, उदासी या भावनात्मक परेशानी।",
+  q_phys: "पिछले 30 दिनों में, कितने दिन आपका शारीरिक स्वास्थ्य ठीक नहीं था?",
+  h_phys: "बीमारी या चोट।", days: "दिन",
+  of100: "आपके जैसे जवाब देने वाले 100 लोगों में से लगभग {n} को दिल की बीमारी है या दिल का दौरा पड़ चुका है।",
+  avg: "सभी वयस्कों का औसत: 100 में {a}", times: "औसत का {x} गुना", pct: "{p}% वयस्कों से ज़्यादा",
+  band_low: "कम जोखिम", band_mod: "बढ़ा हुआ जोखिम", band_high: "उच्च जोखिम",
+  drivers: "आपके परिणाम पर क्या असर डालता है", raises: "बढ़ाता है", lowers: "घटाता है",
+  whatif: "क्या इसे कम कर सकता है", wi_note: "सर्वे डेटा के पैटर्न पर आधारित। ये अनुमान हैं, गारंटी नहीं।",
+  c_active: "शारीरिक रूप से सक्रिय रहें", c_bmi: "BMI 25 तक लाएँ", c_bp: "ब्लड प्रेशर नियंत्रित करें",
+  c_chol: "कोलेस्ट्रॉल नियंत्रित करें", c_alc: "ज़्यादा शराब पीना छोड़ें", c_all: "ये सब एक साथ",
+  nextT: "आगे क्या करें",
+  n_high: "जल्द ही किसी डॉक्टर या स्वास्थ्यकर्मी से मिलें और यह परिणाम दिखाएँ।",
+  n_mod: "अगले कुछ महीनों में दिल की जाँच करवाएँ।",
+  n_low: "स्वस्थ आदतें बनाए रखें और हर साल फिर से जाँच करें।",
+  n_bp: "अपना ब्लड प्रेशर नपवाएँ। यह जल्दी होता है और अक्सर फ़ार्मेसी या क्लिनिक में मुफ़्त होता है।",
+  n_chol: "अगली जाँच में कोलेस्ट्रॉल टेस्ट के लिए कहें।",
+  n_smoke: "किसी भी उम्र में धूम्रपान छोड़ने से दिल का जोखिम घटता है।",
+  n_active: "हर हफ़्ते 150 मिनट तेज़ चलने का लक्ष्य रखें।",
+  emergT: "ये लक्षण हों तो तुरंत मदद लें",
+  emerg: "सीने में दर्द या दबाव, बाँह, जबड़े या पीठ तक फैलता दर्द, साँस फूलना, ठंडा पसीना या अचानक बेहोशी। तुरंत अपने देश का आपातकालीन नंबर मिलाएँ।",
+  disclaimer: "यह एक स्क्रीनिंग टूल है, निदान नहीं। यह दिल की बीमारी की पुष्टि या खंडन नहीं कर सकता।",
+  copy: "परिणाम कॉपी करें", copied: "कॉपी हो गया", restart: "फिर से शुरू करें",
+  aboutT: "यह कैसे काम करता है",
+  about: "यह मॉडल अमेरिका के एक बड़े स्वास्थ्य सर्वे (BRFSS 2015) में {n} वयस्कों के जवाबों से सीखा है। दिल की बीमारी वाले और बिना बीमारी वाले दो लोगों में से यह {auc}% बार सही व्यक्ति चुनता है। स्क्रीनिंग में यह दिल की बीमारी वाले {rec}% लोगों को पहचान लेता है। इसे अभी दूसरे देशों में परखा नहीं गया है, इसलिए परिणाम को एक मार्गदर्शन मानें।",
+  share: "मेरा हृदय जोखिम जाँच परिणाम: 100 में लगभग {n} ({band})।",
+  f: { HighBP: "हाई ब्लड प्रेशर", HighChol: "ज़्यादा कोलेस्ट्रॉल", CholCheck: "कोलेस्ट्रॉल जाँच", BMI: "वज़न (BMI)", Smoker: "धूम्रपान", Stroke: "पहले स्ट्रोक", Diabetes: "डायबिटीज़", PhysActivity: "शारीरिक गतिविधि", HvyAlcoholConsump: "ज़्यादा शराब", MentHlth: "खराब मानसिक स्वास्थ्य के दिन", PhysHlth: "खराब शारीरिक स्वास्थ्य के दिन", Sex: "लिंग", Age: "उम्र" } },
+
+ar: { _name: "العربية", _rtl: true,
+  appName: "فحص خطر القلب", tagline: "فحص للقلب في دقيقتين. بدون تحليل دم.",
+  privacy: "يعمل على هاتفك. إجاباتك لا تغادر هذا الجهاز أبدًا.",
+  steps: ["أنت", "الصحة", "نمط الحياة", "النتيجة"], next: "التالي", back: "رجوع", see: "اعرض نتيجتي",
+  age: "العمر", sex: "الجنس", female: "أنثى", male: "ذكر",
+  body: "الطول والوزن", height: "الطول", weight: "الوزن", bmiIs: "مؤشر كتلة الجسم",
+  yes: "نعم", no: "لا", notSure: "لست متأكدًا",
+  q_bp: "هل أخبرك طبيب أو عامل صحي من قبل أن لديك ارتفاعًا في ضغط الدم؟",
+  q_chol: "هل قيل لك من قبل إن الكوليسترول لديك مرتفع؟",
+  q_cc: "هل فحصت الكوليسترول خلال السنوات الخمس الماضية؟",
+  q_stroke: "هل أُصبت بجلطة دماغية من قبل؟", q_diab: "هل لديك سكري؟",
+  d0: "لا", d1: "مقدمات السكري", d2: "نعم",
+  q_smoke: "هل دخنت 100 سيجارة على الأقل (5 علب) في حياتك كلها؟",
+  q_active: "خلال آخر 30 يومًا، هل مارست أي رياضة أو نشاط بدني غير عملك؟",
+  q_alc: "هل تشرب الكحول بكثرة؟", h_alc: "الرجال: أكثر من 14 مشروبًا أسبوعيًا. النساء: أكثر من 7.",
+  q_ment: "خلال آخر 30 يومًا، كم يومًا لم تكن صحتك النفسية جيدة؟",
+  h_ment: "توتر أو حزن أو مشكلات عاطفية.",
+  q_phys: "خلال آخر 30 يومًا، كم يومًا لم تكن صحتك الجسدية جيدة؟",
+  h_phys: "مرض أو إصابة.", days: "يوم",
+  of100: "من بين 100 شخص أجابوا مثلك، نحو {n} لديهم مرض في القلب أو أصيبوا بنوبة قلبية.",
+  avg: "المتوسط لدى البالغين: {a} من 100", times: "{x} أضعاف المتوسط", pct: "أعلى من {p}% من البالغين",
+  band_low: "خطر أقل", band_mod: "خطر مرتفع", band_high: "خطر عالٍ",
+  drivers: "ما يؤثر في نتيجتك", raises: "يرفع", lowers: "يخفض",
+  whatif: "ما الذي قد يخفضها", wi_note: "مبني على أنماط في بيانات مسح صحي. هذه تقديرات وليست ضمانات.",
+  c_active: "ممارسة النشاط البدني", c_bmi: "الوصول إلى مؤشر كتلة 25", c_bp: "ضبط ضغط الدم",
+  c_chol: "ضبط الكوليسترول", c_alc: "التوقف عن الإفراط في الشرب", c_all: "كل ذلك معًا",
+  nextT: "ماذا تفعل الآن",
+  n_high: "راجع طبيبًا أو عاملًا صحيًا قريبًا وأرِه هذه النتيجة.",
+  n_mod: "احجز فحصًا للقلب خلال الأشهر القادمة.",
+  n_low: "حافظ على عاداتك الصحية وأعد الفحص كل عام.",
+  n_bp: "قِس ضغط دمك. الأمر سريع وغالبًا مجاني في الصيدليات والعيادات.",
+  n_chol: "اطلب تحليل الكوليسترول في فحصك القادم.",
+  n_smoke: "الإقلاع عن التدخين في أي عمر يقلل خطر أمراض القلب.",
+  n_active: "استهدف 150 دقيقة من المشي السريع كل أسبوع.",
+  emergT: "اطلب المساعدة فورًا إذا ظهرت هذه العلامات",
+  emerg: "ألم أو ضغط في الصدر، ألم يمتد إلى الذراع أو الفك أو الظهر، ضيق في التنفس، عرق بارد أو إغماء مفاجئ. اتصل برقم الطوارئ في بلدك فورًا.",
+  disclaimer: "هذه أداة فحص أولي وليست تشخيصًا. لا يمكنها تأكيد أمراض القلب أو نفيها.",
+  copy: "انسخ النتيجة", copied: "تم النسخ", restart: "ابدأ من جديد",
+  aboutT: "كيف يعمل",
+  about: "تعلّم النموذج من إجابات {n} بالغ في مسح صحي أمريكي كبير (BRFSS 2015). عند مقارنة شخص مصاب بمرض القلب وآخر غير مصاب، يختار الصحيح في {auc}% من المرات. وعند استخدامه للفحص يكتشف {rec}% من المصابين. لم يُختبر بعد في دول أخرى، لذا اعتبر نتيجتك دليلًا إرشاديًا.",
+  share: "نتيجتي في فحص خطر القلب: نحو {n} من 100 ({band}).",
+  f: { HighBP: "ارتفاع ضغط الدم", HighChol: "ارتفاع الكوليسترول", CholCheck: "فحص الكوليسترول", BMI: "الوزن (مؤشر الكتلة)", Smoker: "التدخين", Stroke: "جلطة سابقة", Diabetes: "السكري", PhysActivity: "النشاط البدني", HvyAlcoholConsump: "الإفراط في الكحول", MentHlth: "أيام صحة نفسية سيئة", PhysHlth: "أيام صحة جسدية سيئة", Sex: "الجنس", Age: "العمر" } },
+
+sw: { _name: "Kiswahili",
+  appName: "Kipimo cha Hatari ya Moyo", tagline: "Uchunguzi wa moyo kwa dakika mbili. Hakuna kipimo cha damu.",
+  privacy: "Kinafanya kazi kwenye simu yako. Majibu yako hayatoki kwenye kifaa hiki.",
+  steps: ["Wewe", "Afya", "Mtindo wa maisha", "Matokeo"], next: "Endelea", back: "Rudi", see: "Ona matokeo yangu",
+  age: "Umri", sex: "Jinsia", female: "Mwanamke", male: "Mwanamume",
+  body: "Urefu na uzito", height: "Urefu", weight: "Uzito", bmiIs: "BMI yako",
+  yes: "Ndiyo", no: "Hapana", notSure: "Sijui",
+  q_bp: "Je, daktari au mhudumu wa afya amewahi kukuambia una shinikizo la damu la juu?",
+  q_chol: "Je, umewahi kuambiwa una lehemu (kolesteroli) ya juu?",
+  q_cc: "Je, umepima lehemu katika miaka 5 iliyopita?",
+  q_stroke: "Je, umewahi kupata kiharusi?", q_diab: "Je, una kisukari?",
+  d0: "Hapana", d1: "Dalili za awali za kisukari", d2: "Ndiyo",
+  q_smoke: "Je, umevuta angalau sigara 100 (pakiti 5) maishani mwako?",
+  q_active: "Katika siku 30 zilizopita, je, ulifanya mazoezi au shughuli za mwili nje ya kazi yako?",
+  q_alc: "Je, unakunywa pombe kupita kiasi?", h_alc: "Wanaume: zaidi ya vinywaji 14 kwa wiki. Wanawake: zaidi ya 7.",
+  q_ment: "Katika siku 30 zilizopita, ni siku ngapi afya yako ya akili haikuwa nzuri?",
+  h_ment: "Msongo wa mawazo, huzuni au matatizo ya kihisia.",
+  q_phys: "Katika siku 30 zilizopita, ni siku ngapi afya yako ya mwili haikuwa nzuri?",
+  h_phys: "Ugonjwa au jeraha.", days: "siku",
+  of100: "Kati ya watu 100 wenye majibu kama yako, takriban {n} wana ugonjwa wa moyo au wamewahi kupata shambulio la moyo.",
+  avg: "Wastani kwa watu wazima: {a} kati ya 100", times: "Mara {x} ya wastani", pct: "Juu kuliko {p}% ya watu wazima",
+  band_low: "Hatari ndogo", band_mod: "Hatari imeongezeka", band_high: "Hatari kubwa",
+  drivers: "Kinachoathiri matokeo yako", raises: "huongeza", lowers: "hupunguza",
+  whatif: "Kinachoweza kuipunguza", wi_note: "Kulingana na mwenendo wa data za utafiti. Haya ni makadirio, si uhakika.",
+  c_active: "Fanya mazoezi", c_bmi: "Fikia BMI ya 25", c_bp: "Dhibiti shinikizo la damu",
+  c_chol: "Dhibiti lehemu", c_alc: "Acha kunywa pombe kupita kiasi", c_all: "Yote haya pamoja",
+  nextT: "Hatua zinazofuata",
+  n_high: "Mwone daktari au mhudumu wa afya hivi karibuni na umwonyeshe matokeo haya.",
+  n_mod: "Panga uchunguzi wa moyo katika miezi michache ijayo.",
+  n_low: "Endelea na tabia nzuri za afya na upime tena kila mwaka.",
+  n_bp: "Pima shinikizo la damu. Ni haraka, na mara nyingi ni bure kwenye maduka ya dawa na zahanati.",
+  n_chol: "Omba kipimo cha lehemu katika uchunguzi wako ujao.",
+  n_smoke: "Kuacha kuvuta sigara katika umri wowote hupunguza hatari ya moyo.",
+  n_active: "Lenga dakika 150 za kutembea haraka kila wiki.",
+  emergT: "Tafuta msaada sasa ukiwa na dalili hizi",
+  emerg: "Maumivu au kubanwa kifuani, maumivu yanayosambaa kwenye mkono, taya au mgongo, kushindwa kupumua, jasho baridi au kuzimia ghafla. Piga namba ya dharura ya nchi yako mara moja.",
+  disclaimer: "Hiki ni kipimo cha awali, si utambuzi wa ugonjwa. Hakiwezi kuthibitisha wala kuondoa ugonjwa wa moyo.",
+  copy: "Nakili matokeo", copied: "Imenakiliwa", restart: "Anza upya",
+  aboutT: "Jinsi kinavyofanya kazi",
+  about: "Mfumo huu ulijifunza kutoka kwa majibu ya watu wazima {n} katika utafiti mkubwa wa afya wa Marekani (BRFSS 2015). Ukipewa mtu mwenye ugonjwa wa moyo na asiye nao, huchagua sahihi mara {auc}%. Ukitumika kwa uchunguzi, hugundua {rec}% ya wenye ugonjwa wa moyo. Bado haujajaribiwa katika nchi nyingine, kwa hivyo chukulia matokeo kama mwongozo.",
+  share: "Matokeo yangu ya Kipimo cha Hatari ya Moyo: takriban {n} kati ya 100 ({band}).",
+  f: { HighBP: "Shinikizo la damu la juu", HighChol: "Lehemu ya juu", CholCheck: "Kipimo cha lehemu", BMI: "Uzito (BMI)", Smoker: "Historia ya uvutaji", Stroke: "Kiharusi cha awali", Diabetes: "Kisukari", PhysActivity: "Mazoezi", HvyAlcoholConsump: "Pombe kupita kiasi", MentHlth: "Siku za afya mbaya ya akili", PhysHlth: "Siku za afya mbaya ya mwili", Sex: "Jinsia", Age: "Umri" } },
+
+zh: { _name: "中文",
+  appName: "心脏风险自测", tagline: "两分钟心脏筛查，无需验血。",
+  privacy: "在你的手机上运行，你的回答不会离开这台设备。",
+  steps: ["基本信息", "健康", "生活方式", "结果"], next: "下一步", back: "返回", see: "查看结果",
+  age: "年龄", sex: "性别", female: "女", male: "男",
+  body: "身高和体重", height: "身高", weight: "体重", bmiIs: "你的 BMI",
+  yes: "是", no: "否", notSure: "不确定",
+  q_bp: "医生或医务人员是否告诉过你患有高血压？",
+  q_chol: "是否有人告诉过你胆固醇偏高？",
+  q_cc: "过去 5 年内你检查过胆固醇吗？",
+  q_stroke: "你是否曾经中风？", q_diab: "你有糖尿病吗？",
+  d0: "没有", d1: "糖尿病前期", d2: "有",
+  q_smoke: "你一生中是否至少吸过 100 支烟（5 包）？",
+  q_active: "过去 30 天里，除了工作之外你做过运动或体育活动吗？",
+  q_alc: "你是否大量饮酒？", h_alc: "男性：每周超过 14 杯。女性：超过 7 杯。",
+  q_ment: "过去 30 天里，有几天你的心理健康状况不好？",
+  h_ment: "压力、情绪低落或情绪困扰。",
+  q_phys: "过去 30 天里，有几天你的身体健康状况不好？",
+  h_phys: "生病或受伤。", days: "天",
+  of100: "在 100 个回答与你相似的人中，约有 {n} 人患有心脏病或曾经心脏病发作。",
+  avg: "成年人平均：100 人中 {a} 人", times: "平均水平的 {x} 倍", pct: "高于 {p}% 的成年人",
+  band_low: "风险较低", band_mod: "风险升高", band_high: "高风险",
+  drivers: "影响你结果的因素", raises: "升高", lowers: "降低",
+  whatif: "哪些改变可以降低风险", wi_note: "基于调查数据中的规律，仅为估计，不作保证。",
+  c_active: "开始运动", c_bmi: "BMI 降到 25", c_bp: "控制血压",
+  c_chol: "控制胆固醇", c_alc: "停止大量饮酒", c_all: "以上全部",
+  nextT: "下一步该做什么",
+  n_high: "尽快就医，并把这个结果给医生看。",
+  n_mod: "在接下来几个月内做一次心脏健康检查。",
+  n_low: "保持健康习惯，每年再测一次。",
+  n_bp: "去量一下血压。很快，药店和诊所常常免费提供。",
+  n_chol: "下次体检时要求检查胆固醇。",
+  n_smoke: "任何年龄戒烟都能降低心脏风险。",
+  n_active: "目标是每周快走 150 分钟。",
+  emergT: "出现以下症状请立即求助",
+  emerg: "胸痛或胸闷，疼痛放射到手臂、下巴或背部，呼吸急促，出冷汗或突然晕厥。请立即拨打当地急救电话。",
+  disclaimer: "这是筛查工具，不是诊断。它无法确诊或排除心脏病。",
+  copy: "复制结果", copied: "已复制", restart: "重新开始",
+  aboutT: "工作原理",
+  about: "该模型学习自美国一项大型健康调查（BRFSS 2015）中 {n} 名成年人的回答。给它一位心脏病患者和一位非患者，它有 {auc}% 的概率选对。用于筛查时，它能发现 {rec}% 的心脏病患者。它尚未在其他国家验证，请把结果当作参考。",
+  share: "我的心脏风险自测结果：100 人中约 {n} 人（{band}）。",
+  f: { HighBP: "高血压", HighChol: "高胆固醇", CholCheck: "胆固醇检查", BMI: "体重（BMI）", Smoker: "吸烟史", Stroke: "中风史", Diabetes: "糖尿病", PhysActivity: "体育活动", HvyAlcoholConsump: "大量饮酒", MentHlth: "心理状态不佳天数", PhysHlth: "身体状态不佳天数", Sex: "性别", Age: "年龄" } }
+};
+</script>
+<script>// ---- Model maths (runs fully on the device) ----
+function rawScore(M, x) {
+  const z = x.map((v, i) => (v - M.mean1[i]) / M.scale1[i]);
+  let logit = M.intercept;
+  for (let k = 0; k < M.powers.length; k++) {
+    const pw = M.powers[k];
+    let t = 1;
+    for (let j = 0; j < pw.length; j++) if (pw[j]) t *= pw[j] === 1 ? z[j] : Math.pow(z[j], pw[j]);
+    logit += M.coef[k] * (t - M.mean2[k]) / M.scale2[k];
+  }
+  return 1 / (1 + Math.exp(-logit));
+}
+// values: object keyed by feature name; null for HighBP / HighChol means "not sure"
+function scorePerson(M, values) {
+  const F = M.features;
+  const unknown = ["HighBP", "HighChol"].filter(f => values[f] === null || values[f] === undefined);
+  let combos = [{ w: 1, v: Object.assign({}, values) }];
+  for (const f of unknown) {
+    const prev = M.mean1[F.indexOf(f)];
+    combos = combos.flatMap(c => [
+      { w: c.w * prev, v: Object.assign({}, c.v, { [f]: 1 }) },
+      { w: c.w * (1 - prev), v: Object.assign({}, c.v, { [f]: 0 }) }]);
+  }
+  let s = 0;
+  for (const c of combos) s += c.w * rawScore(M, F.map(f => c.v[f]));
+  s = Math.min(Math.max(s, 1e-6), 1 - 1e-6);
+  // balanced class weights behave like a 50/50 prior: shift odds back to the real prevalence
+  const odds = s / (1 - s) * M.base_rate / (1 - M.base_rate);
+  const prob = odds / (1 + odds);
+  let lo = 0, hi = M.quantiles.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (M.quantiles[mid] < s) lo = mid + 1; else hi = mid; }
+  const pct = Math.round(lo / (M.quantiles.length - 1) * 100);
+  return { score: s, prob, pct };
+}
+// linear-model contributions (log-odds, relative to an average respondent)
+function contributions(M, values) {
+  return M.features.map((f, i) => {
+    let v = values[f];
+    if (v === null || v === undefined) v = M.ex_mean[i];
+    return { f, c: M.ex_coef[i] * (v - M.ex_mean[i]) / M.ex_scale[i] };
+  });
+}
+
+</script>
+<script>
+const M = JSON.parse(document.getElementById("model").textContent);
+const AGES = ["18–24","25–29","30–34","35–39","40–44","45–49","50–54","55–59","60–64","65–69","70–74","75–79","80+"];
+const store = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+                set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} } };
+const DEFAULT = { Age: 8, Sex: 0, unit: "m", cm: 170, kg: 75, ft: 5, inch: 7, lb: 165,
+  HighBP: 0, HighChol: 0, CholCheck: 1, Stroke: 0, Diabetes: 0, Smoker: 0, PhysActivity: 1, HvyAlcoholConsump: 0, MentHlth: 0, PhysHlth: 0 };
+let st = Object.assign({}, DEFAULT, store.get("hrc_answers") || {});
+let step = 0;
+let lang = store.get("hrc_lang") || (() => { const n = (navigator.language || "en").slice(0, 2); return I18N[n] ? n : "en"; })();
+const T = () => I18N[lang];
+const fmt = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => o[k]);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function bmi() {
+  let v = st.unit === "m" ? st.kg / Math.pow(st.cm / 100, 2) : 703 * st.lb / Math.pow(st.ft * 12 + st.inch, 2);
+  return isFinite(v) ? Math.min(98, Math.max(12, Math.round(v * 10) / 10)) : 25;
+}
+function values(over) {
+  const v = { HighBP: st.HighBP, HighChol: st.HighChol, CholCheck: st.CholCheck, BMI: bmi(), Smoker: st.Smoker, Stroke: st.Stroke,
+    Diabetes: st.Diabetes, PhysActivity: st.PhysActivity, HvyAlcoholConsump: st.HvyAlcoholConsump, MentHlth: st.MentHlth,
+    PhysHlth: st.PhysHlth, Sex: st.Sex, Age: st.Age };
+  return Object.assign(v, over || {});
+}
+const per100 = p => p * 100 < 1 ? "<1" : String(Math.round(p * 100));
+
+function seg(key, opts) {
+  return `<div class="seg" role="radiogroup">${opts.map(([val, lab]) => {
+    const id = `${key}_${val}`;
+    const chk = String(st[key]) === String(val) ? "checked" : "";
+    return `<input type="radio" id="${id}" name="${key}" value="${val}" ${chk}><label for="${id}">${esc(lab)}</label>`;
+  }).join("")}</div>`;
+}
+const q = (key, legend, opts, hint) => `<fieldset class="q"><legend>${esc(legend)}</legend>${hint ? `<div class="hint">${esc(hint)}</div>` : ""}${seg(key, opts)}</fieldset>`;
+const yn = t => [[1, t.yes], [0, t.no]];
+const yns = t => [[1, t.yes], [0, t.no], ["null", t.notSure]];
+const slider = (key, legend, hint, t) => `<div class="q"><label class="lbl" for="${key}">${esc(legend)}</label>${hint ? `<div class="hint">${esc(hint)}</div>` : ""}
+  <div class="slider"><input type="range" id="${key}" min="0" max="30" step="1" value="${st[key]}"><output id="${key}_o">${st[key]} ${esc(t.days)}</output></div></div>`;
+
+function stepHTML(t) {
+  if (step === 0) return `<section class="card">
+    <div class="q"><label class="lbl" for="Age">${esc(t.age)}</label>
+      <select class="full" id="Age">${AGES.map((a, i) => `<option value="${i + 1}" ${st.Age === i + 1 ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+    ${q("Sex", t.sex, [[0, t.female], [1, t.male]])}
+    <div class="q"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-weight:600">${esc(t.body)}</span>
+      <div class="units">${seg("unit", [["m", "kg · cm"], ["i", "lb · ft"]])}</div></div>
+      ${st.unit === "m"
+        ? `<div class="row"><label class="num">${esc(t.height)} (cm)<input type="number" inputmode="decimal" id="cm" min="100" max="230" value="${st.cm}"></label>
+           <label class="num">${esc(t.weight)} (kg)<input type="number" inputmode="decimal" id="kg" min="25" max="300" value="${st.kg}"></label></div>`
+        : `<div class="row three"><label class="num">${esc(t.height)} (ft)<input type="number" inputmode="numeric" id="ft" min="3" max="7" value="${st.ft}"></label>
+           <label class="num">(in)<input type="number" inputmode="numeric" id="inch" min="0" max="11" value="${st.inch}"></label>
+           <label class="num">${esc(t.weight)} (lb)<input type="number" inputmode="decimal" id="lb" min="55" max="660" value="${st.lb}"></label></div>`}
+      <div class="bmi"><span>${esc(t.bmiIs)}</span><b id="bmiOut">${bmi().toFixed(1)}</b></div></div>
+  </section>`;
+  if (step === 1) return `<section class="card">
+    ${q("HighBP", t.q_bp, yns(t))}${q("HighChol", t.q_chol, yns(t))}${q("CholCheck", t.q_cc, yn(t))}
+    ${q("Stroke", t.q_stroke, yn(t))}${q("Diabetes", t.q_diab, [[0, t.d0], [1, t.d1], [2, t.d2]])}</section>`;
+  if (step === 2) return `<section class="card">
+    ${q("Smoker", t.q_smoke, yn(t))}${q("PhysActivity", t.q_active, yn(t))}${q("HvyAlcoholConsump", t.q_alc, yn(t), t.h_alc)}
+    ${slider("MentHlth", t.q_ment, t.h_ment, t)}${slider("PhysHlth", t.q_phys, t.h_phys, t)}</section>`;
+  return resultHTML(t);
+}
+
+function resultHTML(t) {
+  const v = values(), r = scorePerson(M, v);
+  const band = r.score >= M.threshold ? "high" : r.score >= 0.5 ? "mod" : "low";
+  const bandTxt = t["band_" + band];
+  const n = Math.round(r.prob * 100);
+  const times = (r.prob / M.base_rate);
+  const dots = Array.from({ length: 100 }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("");
+
+  // drivers
+  const con = contributions(M, v).filter(c => Math.abs(c.c) > 0.03).sort((a, b) => Math.abs(b.c) - Math.abs(a.c)).slice(0, 6);
+  const mx = Math.max(0.3, ...con.map(c => Math.abs(c.c)));
+  const drv = con.map(c => `<div class="r"><span class="lab">${esc(t.f[c.f])}</span><span class="tr"><span class="b ${c.c > 0 ? "up" : "dn"}" style="width:${(Math.abs(c.c) / mx * 50).toFixed(1)}%"></span></span></div>`).join("");
+
+  // what-if
+  const ch = [];
+  if (!st.PhysActivity) ch.push([t.c_active, { PhysActivity: 1 }]);
+  if (v.BMI > 25) ch.push([t.c_bmi, { BMI: 25 }]);
+  if (st.HighBP === 1) ch.push([t.c_bp, { HighBP: 0 }]);
+  if (st.HighChol === 1) ch.push([t.c_chol, { HighChol: 0 }]);
+  if (st.HvyAlcoholConsump) ch.push([t.c_alc, { HvyAlcoholConsump: 0 }]);
+  let wi = "";
+  if (ch.length) {
+    const rows = ch.map(([lab, o]) => [lab, scorePerson(M, values(o)).prob]).filter(([, p]) => Math.round(p * 100) < n);
+    if (ch.length > 1 && rows.length > 1) rows.push([t.c_all, scorePerson(M, values(Object.assign({}, ...ch.map(c => c[1])))).prob]);
+    if (rows.length) wi = `<section class="card"><h2>${esc(t.whatif)}</h2><table class="wi"><tbody>${rows.map(([lab, p]) => {
+      const d = Math.round(p * 100) - n;
+      return `<tr><td>${esc(lab)}</td><td>${per100(p)} / 100 ${d < 0 ? `<span class="d">(${d})</span>` : ""}</td></tr>`;
+    }).join("")}</tbody></table><p class="note">${esc(t.wi_note)}</p></section>`;
+  }
+
+  // next steps
+  const ns = [t["n_" + band]];
+  if (st.HighBP === null) ns.push(t.n_bp);
+  if (st.HighChol === null || !st.CholCheck) ns.push(t.n_chol);
+  if (st.Smoker) ns.push(t.n_smoke);
+  if (!st.PhysActivity) ns.push(t.n_active);
+
+  window.__share = fmt(t.share, { n: per100(r.prob), band: bandTxt });
+  return `<section class="card verdict" aria-live="polite">
+      <span class="chip ${band}">${esc(bandTxt)}</span>
+      <div class="big"><div class="n">${per100(r.prob)}<small>/ 100</small></div><div class="waffle" aria-hidden="true">${dots}</div></div>
+      <p class="sentence">${esc(fmt(t.of100, { n: per100(r.prob) }))}</p>
+      <div class="facts"><span>${esc(fmt(t.avg, { a: Math.round(M.base_rate * 100) }))}</span>
+        <span>${esc(fmt(t.times, { x: times.toFixed(1) }))}</span><span>${esc(fmt(t.pct, { p: r.pct }))}</span></div>
+      <div class="scale" dir="ltr" aria-hidden="true"><b style="left:${Math.min(99, Math.max(1, r.pct))}%"></b></div>
+    </section>
+    ${drv ? `<section class="card"><h2>${esc(t.drivers)}</h2><div class="drv" dir="ltr">${drv}</div>
+      <div class="legend" dir="ltr"><span>← ${esc(t.lowers)}</span><span>${esc(t.raises)} →</span></div></section>` : ""}
+    ${wi}
+    <section class="card"><h2>${esc(t.nextT)}</h2><ol class="steps">${ns.map(s => `<li>${esc(s)}</li>`).join("")}</ol></section>
+    <section class="alarm" role="note"><strong>${esc(t.emergT)}</strong><p>${esc(t.emerg)}</p></section>
+    <div class="actions"><button class="btn primary" id="copyBtn" type="button">${esc(t.copy)}</button>
+      <button class="btn ghost" id="restart" type="button">${esc(t.restart)}</button></div>`;
+}
+
+function render() {
+  const t = T();
+  document.documentElement.lang = lang;
+  document.documentElement.dir = t._rtl ? "rtl" : "ltr";
+  document.getElementById("brandName").textContent = t.appName;
+  const m = M.metrics;
+  const nav = step < 3 ? `<div class="nav">${step > 0 ? `<button class="btn ghost" id="back" type="button">${esc(t.back)}</button>` : ""}
+     <button class="btn primary" id="next" type="button">${esc(step === 2 ? t.see : t.next)}</button></div>` : "";
+  document.getElementById("app").innerHTML = `
+    ${step === 0 ? `<div class="intro"><h1>${esc(t.tagline)}</h1><span class="privacy">
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10V8a6 6 0 0 1 12 0v2h1v11H5V10h1zm2 0h8V8a4 4 0 0 0-8 0v2z" fill="currentColor"/></svg>${esc(t.privacy)}</span></div>` : ""}
+    <ol class="rail">${t.steps.map((s, i) => `<li class="${i < step ? "done" : i === step ? "on" : ""}"><span>${esc(s)}</span></li>`).join("")}</ol>
+    ${stepHTML(t)}${nav}
+    <details><summary>${esc(t.aboutT)}</summary><p>${esc(fmt(t.about, { n: M.n.toLocaleString(), auc: Math.round(m.auc * 100), rec: Math.round(m.rec50 * 100) }))}</p></details>
+    <p class="disc">${esc(t.disclaimer)}</p>`;
+  bind();
+}
+
+function bind() {
+  const app = document.getElementById("app");
+  app.querySelectorAll('.seg input').forEach(el => el.addEventListener("change", () => {
+    const k = el.name, raw = el.value;
+    st[k] = raw === "null" ? null : (k === "unit" ? raw : Number(raw));
+    save(); if (k === "unit") render();
+  }));
+  ["cm", "kg", "ft", "inch", "lb"].forEach(k => { const el = document.getElementById(k); if (el) el.addEventListener("input", () => {
+    const x = parseFloat(el.value); if (isFinite(x)) { st[k] = x; document.getElementById("bmiOut").textContent = bmi().toFixed(1); save(); } }); });
+  const age = document.getElementById("Age"); if (age) age.addEventListener("change", () => { st.Age = Number(age.value); save(); });
+  ["MentHlth", "PhysHlth"].forEach(k => { const el = document.getElementById(k); if (el) el.addEventListener("input", () => {
+    st[k] = Number(el.value); document.getElementById(k + "_o").textContent = `${st[k]} ${T().days}`; save(); }); });
+  const go = d => { step = Math.max(0, Math.min(3, step + d)); render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const nx = document.getElementById("next"); if (nx) nx.onclick = () => go(1);
+  const bk = document.getElementById("back"); if (bk) bk.onclick = () => go(-1);
+  const rs = document.getElementById("restart"); if (rs) rs.onclick = () => { st = Object.assign({}, DEFAULT); save(); step = 0; render(); window.scrollTo({ top: 0 }); };
+  const cp = document.getElementById("copyBtn"); if (cp) cp.onclick = () => {
+    const done = () => { cp.textContent = T().copied; setTimeout(() => cp.textContent = T().copy, 1600); };
+    try { navigator.clipboard.writeText(window.__share).then(done, () => fallbackCopy(done)); } catch (e) { fallbackCopy(done); } };
+}
+function fallbackCopy(done) {
+  const ta = document.createElement("textarea"); ta.value = window.__share; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) {} ta.remove();
+}
+function save() { store.set("hrc_answers", st); }
+
+const sel = document.getElementById("lang");
+sel.innerHTML = Object.keys(I18N).map(k => `<option value="${k}" ${k === lang ? "selected" : ""}>${I18N[k]._name}</option>`).join("");
+sel.addEventListener("change", () => { lang = sel.value; store.set("hrc_lang", lang); render(); });
+if (location.hash === "#result") step = 3;
+render();
+</script>
+
+</body>
+</html>

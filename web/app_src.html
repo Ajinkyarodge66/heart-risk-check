@@ -1,0 +1,313 @@
+<title>Heart Risk Check</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A two-minute heart screening that runs on your phone. No blood test needed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: one narrow column like a clinic leaflet; a step rail on top, one card per step, result as a stacked report. */
+:root {
+  --bg: #eef3f2; --surface: #ffffff; --sunk: #e3ebea; --ink: #0f2328; --muted: #566b70; --line: #cfdcdb;
+  --accent: #c8324b; --accent-soft: #f6dde2; --on-accent: #ffffff;
+  --good: #1d7f57; --good-soft: #d7efe4; --warn: #9a6512; --warn-soft: #f6e8cc; --bad: #c8324b; --bad-soft: #f6dde2;
+  --dot: #c9d6d5;
+  --display: "Bricolage Grotesque", "Noto Sans", system-ui, sans-serif;
+  --body: "Noto Sans", "Noto Sans Devanagari", "Noto Sans Arabic", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1517; --surface: #122023; --sunk: #0e1a1d; --ink: #e4eeef; --muted: #93a9ad; --line: #24393d;
+  --accent: #ff6f83; --accent-soft: #3a1b22; --on-accent: #1a0a0e;
+  --good: #4cc490; --good-soft: #12302a; --warn: #e3ab4f; --warn-soft: #33270f; --bad: #ff6f83; --bad-soft: #3a1b22;
+  --dot: #2b4044; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0b1517; --surface: #122023; --sunk: #0e1a1d; --ink: #e4eeef; --muted: #93a9ad; --line: #24393d;
+  --accent: #ff6f83; --accent-soft: #3a1b22; --on-accent: #1a0a0e;
+  --good: #4cc490; --good-soft: #12302a; --warn: #e3ab4f; --warn-soft: #33270f; --bad: #ff6f83; --bad-soft: #3a1b22;
+  --dot: #2b4044; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.bar-in { max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; min-width: 0; }
+.brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand svg { flex: none; }
+.lang { margin-inline-start: auto; flex: none; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.lang select { background: var(--sunk); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: .9rem; max-width: 9.5rem; }
+
+.wrap { max-width: 600px; margin: 0 auto; padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 16px; }
+.intro h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 6vw, 2.2rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 6px; text-wrap: balance; }
+.intro p { margin: 0; color: var(--muted); }
+.privacy { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-size: .85rem; color: var(--good); background: var(--good-soft); border-radius: 999px; padding: 4px 12px; }
+
+.rail { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; list-style: none; padding: 0; margin: 0; }
+.rail li { font-size: .78rem; color: var(--muted); display: grid; gap: 6px; min-width: 0; }
+.rail li::before { content: ""; height: 5px; border-radius: 3px; background: var(--line); }
+.rail li.done::before, .rail li.on::before { background: var(--accent); }
+.rail li.on { color: var(--ink); font-weight: 600; }
+.rail li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 20px; }
+.q { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.q legend, .q > label.lbl { font-weight: 600; padding: 0; margin-bottom: 10px; }
+.q .hint { color: var(--muted); font-size: .85rem; margin-top: -6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { flex: 1 1 0; min-width: 5.5rem; text-align: center; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--sunk); cursor: pointer; font-weight: 500; transition: background .15s, border-color .15s; }
+.seg input:checked + label { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 700; }
+.seg input:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+select.full { width: 100%; padding: 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--sunk); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row.three { grid-template-columns: 1fr 1fr 1fr; }
+.num { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+.num input { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--sunk); font-size: 1rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bmi { display: flex; justify-content: space-between; align-items: baseline; background: var(--sunk); border-radius: 10px; padding: 10px 14px; }
+.bmi b { font-family: var(--display); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.units { display: flex; gap: 6px; }
+.units .seg label { padding: 6px 10px; min-width: 0; font-size: .85rem; white-space: nowrap; }
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.slider input { width: 100%; accent-color: var(--accent); height: 28px; }
+.slider output { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; min-width: 4.5rem; text-align: end; }
+
+.nav { display: flex; gap: 10px; }
+.btn { border: 0; border-radius: 12px; padding: 14px 18px; font-weight: 700; cursor: pointer; }
+.btn.primary { flex: 1; background: var(--accent); color: var(--on-accent); }
+.btn.ghost { background: transparent; border: 1.5px solid var(--line); }
+.btn:active { transform: translateY(1px); }
+
+/* result */
+.verdict { display: grid; gap: 14px; }
+.chip { justify-self: start; font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; }
+.chip.low { background: var(--good-soft); color: var(--good); }
+.chip.mod { background: var(--warn-soft); color: var(--warn); }
+.chip.high { background: var(--bad-soft); color: var(--bad); }
+.big { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.big .n { font-family: var(--display); font-weight: 800; font-size: clamp(3.4rem, 16vw, 4.6rem); line-height: .9; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.big .n small { font-size: .32em; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-inline-start: 6px; }
+.waffle { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; width: min(100%, 240px); }
+.waffle i { aspect-ratio: 1; border-radius: 50%; background: var(--dot); max-width: 100%; }
+.waffle i.on { background: var(--accent); }
+.sentence { margin: 0; font-size: 1.02rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.facts span { font-size: .85rem; background: var(--sunk); border-radius: 8px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+.scale { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--good-soft), var(--warn-soft) 55%, var(--bad-soft)); margin-top: 6px; }
+.scale b { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); transform: translateX(-50%); }
+h2 { font-family: var(--display); font-size: 1.15rem; margin: 0; letter-spacing: -0.01em; }
+.drv { display: grid; gap: 8px; }
+.drv .r { display: grid; grid-template-columns: minmax(0, 9.5rem) 1fr; gap: 10px; align-items: center; font-size: .88rem; }
+.drv .lab { overflow-wrap: anywhere; unicode-bidi: plaintext; }
+.drv .tr { position: relative; height: 14px; }
+.drv .tr::before { content: ""; position: absolute; inset-inline-start: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--line); }
+.drv .b { position: absolute; top: 0; height: 14px; border-radius: 4px; }
+.drv .b.up { background: var(--bad); inset-inline-start: 50%; }
+.drv .b.dn { background: var(--good); inset-inline-end: 50%; }
+.legend { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); }
+.wi { width: 100%; border-collapse: collapse; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.wi td { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.wi td + td { text-align: end; white-space: nowrap; padding-inline-start: 10px; }
+.wi tr:last-child td { border-bottom: 0; font-weight: 700; }
+.wi .d { color: var(--good); font-weight: 700; }
+.note { color: var(--muted); font-size: .82rem; margin: 0; }
+.steps { margin: 0; padding-inline-start: 1.2rem; display: grid; gap: 8px; }
+.alarm { background: var(--bad-soft); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 6px; }
+.alarm strong { color: var(--bad); }
+.alarm p { margin: 0; font-size: .92rem; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions .btn { flex: 1 1 10rem; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 18px; }
+details summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--muted); font-size: .9rem; margin: 10px 0 0; }
+.disc { color: var(--muted); font-size: .82rem; text-align: center; margin: 0; }
+@media (max-width: 380px) { .row.three { grid-template-columns: 1fr 1fr; } .drv .r { grid-template-columns: minmax(0, 7rem) 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="bar"><div class="bar-in">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 23s-9-5.6-9-12.2A4.8 4.8 0 0 1 13 8a4.8 4.8 0 0 1 9 2.8C22 17.4 13 23 13 23z" fill="var(--accent)"/><path d="M5 13h4l2-3 2.5 6 2-4H21" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span id="brandName">Heart Risk Check</span>
+  </div>
+  <label class="lang"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    <select id="lang" aria-label="Language"></select></label>
+</div></header>
+
+<main class="wrap" id="app"></main>
+
+<script type="application/json" id="model">/*MODEL*/</script>
+<script>/*I18N*/</script>
+<script>/*CORE*/</script>
+<script>
+const M = JSON.parse(document.getElementById("model").textContent);
+const AGES = ["18–24","25–29","30–34","35–39","40–44","45–49","50–54","55–59","60–64","65–69","70–74","75–79","80+"];
+const store = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+                set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} } };
+const DEFAULT = { Age: 8, Sex: 0, unit: "m", cm: 170, kg: 75, ft: 5, inch: 7, lb: 165,
+  HighBP: 0, HighChol: 0, CholCheck: 1, Stroke: 0, Diabetes: 0, Smoker: 0, PhysActivity: 1, HvyAlcoholConsump: 0, MentHlth: 0, PhysHlth: 0 };
+let st = Object.assign({}, DEFAULT, store.get("hrc_answers") || {});
+let step = 0;
+let lang = store.get("hrc_lang") || (() => { const n = (navigator.language || "en").slice(0, 2); return I18N[n] ? n : "en"; })();
+const T = () => I18N[lang];
+const fmt = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => o[k]);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function bmi() {
+  let v = st.unit === "m" ? st.kg / Math.pow(st.cm / 100, 2) : 703 * st.lb / Math.pow(st.ft * 12 + st.inch, 2);
+  return isFinite(v) ? Math.min(98, Math.max(12, Math.round(v * 10) / 10)) : 25;
+}
+function values(over) {
+  const v = { HighBP: st.HighBP, HighChol: st.HighChol, CholCheck: st.CholCheck, BMI: bmi(), Smoker: st.Smoker, Stroke: st.Stroke,
+    Diabetes: st.Diabetes, PhysActivity: st.PhysActivity, HvyAlcoholConsump: st.HvyAlcoholConsump, MentHlth: st.MentHlth,
+    PhysHlth: st.PhysHlth, Sex: st.Sex, Age: st.Age };
+  return Object.assign(v, over || {});
+}
+const per100 = p => p * 100 < 1 ? "<1" : String(Math.round(p * 100));
+
+function seg(key, opts) {
+  return `<div class="seg" role="radiogroup">${opts.map(([val, lab]) => {
+    const id = `${key}_${val}`;
+    const chk = String(st[key]) === String(val) ? "checked" : "";
+    return `<input type="radio" id="${id}" name="${key}" value="${val}" ${chk}><label for="${id}">${esc(lab)}</label>`;
+  }).join("")}</div>`;
+}
+const q = (key, legend, opts, hint) => `<fieldset class="q"><legend>${esc(legend)}</legend>${hint ? `<div class="hint">${esc(hint)}</div>` : ""}${seg(key, opts)}</fieldset>`;
+const yn = t => [[1, t.yes], [0, t.no]];
+const yns = t => [[1, t.yes], [0, t.no], ["null", t.notSure]];
+const slider = (key, legend, hint, t) => `<div class="q"><label class="lbl" for="${key}">${esc(legend)}</label>${hint ? `<div class="hint">${esc(hint)}</div>` : ""}
+  <div class="slider"><input type="range" id="${key}" min="0" max="30" step="1" value="${st[key]}"><output id="${key}_o">${st[key]} ${esc(t.days)}</output></div></div>`;
+
+function stepHTML(t) {
+  if (step === 0) return `<section class="card">
+    <div class="q"><label class="lbl" for="Age">${esc(t.age)}</label>
+      <select class="full" id="Age">${AGES.map((a, i) => `<option value="${i + 1}" ${st.Age === i + 1 ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+    ${q("Sex", t.sex, [[0, t.female], [1, t.male]])}
+    <div class="q"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-weight:600">${esc(t.body)}</span>
+      <div class="units">${seg("unit", [["m", "kg · cm"], ["i", "lb · ft"]])}</div></div>
+      ${st.unit === "m"
+        ? `<div class="row"><label class="num">${esc(t.height)} (cm)<input type="number" inputmode="decimal" id="cm" min="100" max="230" value="${st.cm}"></label>
+           <label class="num">${esc(t.weight)} (kg)<input type="number" inputmode="decimal" id="kg" min="25" max="300" value="${st.kg}"></label></div>`
+        : `<div class="row three"><label class="num">${esc(t.height)} (ft)<input type="number" inputmode="numeric" id="ft" min="3" max="7" value="${st.ft}"></label>
+           <label class="num">(in)<input type="number" inputmode="numeric" id="inch" min="0" max="11" value="${st.inch}"></label>
+           <label class="num">${esc(t.weight)} (lb)<input type="number" inputmode="decimal" id="lb" min="55" max="660" value="${st.lb}"></label></div>`}
+      <div class="bmi"><span>${esc(t.bmiIs)}</span><b id="bmiOut">${bmi().toFixed(1)}</b></div></div>
+  </section>`;
+  if (step === 1) return `<section class="card">
+    ${q("HighBP", t.q_bp, yns(t))}${q("HighChol", t.q_chol, yns(t))}${q("CholCheck", t.q_cc, yn(t))}
+    ${q("Stroke", t.q_stroke, yn(t))}${q("Diabetes", t.q_diab, [[0, t.d0], [1, t.d1], [2, t.d2]])}</section>`;
+  if (step === 2) return `<section class="card">
+    ${q("Smoker", t.q_smoke, yn(t))}${q("PhysActivity", t.q_active, yn(t))}${q("HvyAlcoholConsump", t.q_alc, yn(t), t.h_alc)}
+    ${slider("MentHlth", t.q_ment, t.h_ment, t)}${slider("PhysHlth", t.q_phys, t.h_phys, t)}</section>`;
+  return resultHTML(t);
+}
+
+function resultHTML(t) {
+  const v = values(), r = scorePerson(M, v);
+  const band = r.score >= M.threshold ? "high" : r.score >= 0.5 ? "mod" : "low";
+  const bandTxt = t["band_" + band];
+  const n = Math.round(r.prob * 100);
+  const times = (r.prob / M.base_rate);
+  const dots = Array.from({ length: 100 }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("");
+
+  // drivers
+  const con = contributions(M, v).filter(c => Math.abs(c.c) > 0.03).sort((a, b) => Math.abs(b.c) - Math.abs(a.c)).slice(0, 6);
+  const mx = Math.max(0.3, ...con.map(c => Math.abs(c.c)));
+  const drv = con.map(c => `<div class="r"><span class="lab">${esc(t.f[c.f])}</span><span class="tr"><span class="b ${c.c > 0 ? "up" : "dn"}" style="width:${(Math.abs(c.c) / mx * 50).toFixed(1)}%"></span></span></div>`).join("");
+
+  // what-if
+  const ch = [];
+  if (!st.PhysActivity) ch.push([t.c_active, { PhysActivity: 1 }]);
+  if (v.BMI > 25) ch.push([t.c_bmi, { BMI: 25 }]);
+  if (st.HighBP === 1) ch.push([t.c_bp, { HighBP: 0 }]);
+  if (st.HighChol === 1) ch.push([t.c_chol, { HighChol: 0 }]);
+  if (st.HvyAlcoholConsump) ch.push([t.c_alc, { HvyAlcoholConsump: 0 }]);
+  let wi = "";
+  if (ch.length) {
+    const rows = ch.map(([lab, o]) => [lab, scorePerson(M, values(o)).prob]).filter(([, p]) => Math.round(p * 100) < n);
+    if (ch.length > 1 && rows.length > 1) rows.push([t.c_all, scorePerson(M, values(Object.assign({}, ...ch.map(c => c[1])))).prob]);
+    if (rows.length) wi = `<section class="card"><h2>${esc(t.whatif)}</h2><table class="wi"><tbody>${rows.map(([lab, p]) => {
+      const d = Math.round(p * 100) - n;
+      return `<tr><td>${esc(lab)}</td><td>${per100(p)} / 100 ${d < 0 ? `<span class="d">(${d})</span>` : ""}</td></tr>`;
+    }).join("")}</tbody></table><p class="note">${esc(t.wi_note)}</p></section>`;
+  }
+
+  // next steps
+  const ns = [t["n_" + band]];
+  if (st.HighBP === null) ns.push(t.n_bp);
+  if (st.HighChol === null || !st.CholCheck) ns.push(t.n_chol);
+  if (st.Smoker) ns.push(t.n_smoke);
+  if (!st.PhysActivity) ns.push(t.n_active);
+
+  window.__share = fmt(t.share, { n: per100(r.prob), band: bandTxt });
+  return `<section class="card verdict" aria-live="polite">
+      <span class="chip ${band}">${esc(bandTxt)}</span>
+      <div class="big"><div class="n">${per100(r.prob)}<small>/ 100</small></div><div class="waffle" aria-hidden="true">${dots}</div></div>
+      <p class="sentence">${esc(fmt(t.of100, { n: per100(r.prob) }))}</p>
+      <div class="facts"><span>${esc(fmt(t.avg, { a: Math.round(M.base_rate * 100) }))}</span>
+        <span>${esc(fmt(t.times, { x: times.toFixed(1) }))}</span><span>${esc(fmt(t.pct, { p: r.pct }))}</span></div>
+      <div class="scale" dir="ltr" aria-hidden="true"><b style="left:${Math.min(99, Math.max(1, r.pct))}%"></b></div>
+    </section>
+    ${drv ? `<section class="card"><h2>${esc(t.drivers)}</h2><div class="drv" dir="ltr">${drv}</div>
+      <div class="legend" dir="ltr"><span>← ${esc(t.lowers)}</span><span>${esc(t.raises)} →</span></div></section>` : ""}
+    ${wi}
+    <section class="card"><h2>${esc(t.nextT)}</h2><ol class="steps">${ns.map(s => `<li>${esc(s)}</li>`).join("")}</ol></section>
+    <section class="alarm" role="note"><strong>${esc(t.emergT)}</strong><p>${esc(t.emerg)}</p></section>
+    <div class="actions"><button class="btn primary" id="copyBtn" type="button">${esc(t.copy)}</button>
+      <button class="btn ghost" id="restart" type="button">${esc(t.restart)}</button></div>`;
+}
+
+function render() {
+  const t = T();
+  document.documentElement.lang = lang;
+  document.documentElement.dir = t._rtl ? "rtl" : "ltr";
+  document.getElementById("brandName").textContent = t.appName;
+  const m = M.metrics;
+  const nav = step < 3 ? `<div class="nav">${step > 0 ? `<button class="btn ghost" id="back" type="button">${esc(t.back)}</button>` : ""}
+     <button class="btn primary" id="next" type="button">${esc(step === 2 ? t.see : t.next)}</button></div>` : "";
+  document.getElementById("app").innerHTML = `
+    ${step === 0 ? `<div class="intro"><h1>${esc(t.tagline)}</h1><span class="privacy">
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10V8a6 6 0 0 1 12 0v2h1v11H5V10h1zm2 0h8V8a4 4 0 0 0-8 0v2z" fill="currentColor"/></svg>${esc(t.privacy)}</span></div>` : ""}
+    <ol class="rail">${t.steps.map((s, i) => `<li class="${i < step ? "done" : i === step ? "on" : ""}"><span>${esc(s)}</span></li>`).join("")}</ol>
+    ${stepHTML(t)}${nav}
+    <details><summary>${esc(t.aboutT)}</summary><p>${esc(fmt(t.about, { n: M.n.toLocaleString(), auc: Math.round(m.auc * 100), rec: Math.round(m.rec50 * 100) }))}</p></details>
+    <p class="disc">${esc(t.disclaimer)}</p>`;
+  bind();
+}
+
+function bind() {
+  const app = document.getElementById("app");
+  app.querySelectorAll('.seg input').forEach(el => el.addEventListener("change", () => {
+    const k = el.name, raw = el.value;
+    st[k] = raw === "null" ? null : (k === "unit" ? raw : Number(raw));
+    save(); if (k === "unit") render();
+  }));
+  ["cm", "kg", "ft", "inch", "lb"].forEach(k => { const el = document.getElementById(k); if (el) el.addEventListener("input", () => {
+    const x = parseFloat(el.value); if (isFinite(x)) { st[k] = x; document.getElementById("bmiOut").textContent = bmi().toFixed(1); save(); } }); });
+  const age = document.getElementById("Age"); if (age) age.addEventListener("change", () => { st.Age = Number(age.value); save(); });
+  ["MentHlth", "PhysHlth"].forEach(k => { const el = document.getElementById(k); if (el) el.addEventListener("input", () => {
+    st[k] = Number(el.value); document.getElementById(k + "_o").textContent = `${st[k]} ${T().days}`; save(); }); });
+  const go = d => { step = Math.max(0, Math.min(3, step + d)); render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const nx = document.getElementById("next"); if (nx) nx.onclick = () => go(1);
+  const bk = document.getElementById("back"); if (bk) bk.onclick = () => go(-1);
+  const rs = document.getElementById("restart"); if (rs) rs.onclick = () => { st = Object.assign({}, DEFAULT); save(); step = 0; render(); window.scrollTo({ top: 0 }); };
+  const cp = document.getElementById("copyBtn"); if (cp) cp.onclick = () => {
+    const done = () => { cp.textContent = T().copied; setTimeout(() => cp.textContent = T().copy, 1600); };
+    try { navigator.clipboard.writeText(window.__share).then(done, () => fallbackCopy(done)); } catch (e) { fallbackCopy(done); } };
+}
+function fallbackCopy(done) {
+  const ta = document.createElement("textarea"); ta.value = window.__share; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) {} ta.remove();
+}
+function save() { store.set("hrc_answers", st); }
+
+const sel = document.getElementById("lang");
+sel.innerHTML = Object.keys(I18N).map(k => `<option value="${k}" ${k === lang ? "selected" : ""}>${I18N[k]._name}</option>`).join("");
+sel.addEventListener("change", () => { lang = sel.value; store.set("hrc_lang", lang); render(); });
+if (location.hash === "#result") step = 3;
+render();
+</script>
